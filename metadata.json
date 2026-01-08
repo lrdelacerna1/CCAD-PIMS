@@ -1,0 +1,5 @@
+{
+  "name": "CCAD PIMS",
+  "description": "A mobile-first, scalable web application for user account management (PIMS - Personal Information Management System), including authentication and profile management, built with React and Tailwind CSS.",
+  "requestFramePermissions": []
+}

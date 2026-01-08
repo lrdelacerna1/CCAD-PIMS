@@ -1,0 +1,263 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+// FIX: Use specific request types instead of the legacy Reservation type.
+import { Area, EquipmentRequest, RoomRequest, User } from '../types';
+import { getAreasApi } from '../../backend/api/areas';
+// FIX: Import from existing APIs for equipment and room requests.
+import { getAllEquipmentRequestsApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
+import { getAllRoomRequestsApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
+import { getAllUsersApi } from '../../backend/api/auth';
+import RequestManagementTable from '../components/dashboard/RequestManagementTable';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { SearchIcon } from '../components/Icons';
+import { Button } from '../components/ui/Button';
+import { ToggleSwitch } from '../components/ui/ToggleSwitch';
+import ReservationDetailsModal from '../components/reservations/ReservationDetailsModal';
+
+// FIX: Combined request type for unified handling.
+type AnyRequest = EquipmentRequest | RoomRequest;
+
+const RequestsPage: React.FC = () => {
+    const { user } = useAuth();
+    const [requests, setRequests] = useState<AnyRequest[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [areas, setAreas] = useState<Area[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
+    const [actionMessage, setActionMessage] = useState('');
+    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [areaFilter, setAreaFilter] = useState('all');
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+    const [selectedRequest, setSelectedRequest] = useState<AnyRequest | null>(null);
+    const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
+
+    const fetchData = useCallback(async () => {
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
+
+        setIsLoading(true);
+        setError('');
+        try {
+            const [equipmentData, roomData, areasData, usersData] = await Promise.all([
+                getAllEquipmentRequestsApi(),
+                getAllRoomRequestsApi(),
+                getAreasApi(),
+                getAllUsersApi(),
+            ]);
+            setRequests([...equipmentData, ...roomData]);
+            setAreas(areasData);
+            setUsers(usersData);
+        } catch (err) {
+            setError('Failed to load request data.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const usersMap = useMemo(() => new Map(users.map(user => [user.id, user])), [users]);
+    const areasMap = useMemo(() => new Map(areas.map(area => [area.id, area.name])), [areas]);
+    
+    const getAreaId = (req: AnyRequest) => {
+        if ('requestedItems' in req) return req.requestedItems[0]?.areaId;
+        if ('requestedRoom' in req) return req.requestedRoom.areaId;
+        return '';
+    };
+
+    const filteredAndSortedRequests = useMemo(() => {
+        const managedIds = new Set(user?.managedAreaIds || []);
+        const isSuperAdmin = user?.role === 'superadmin';
+        
+        let processedRequests = requests.filter(r => 
+            (r.status === 'For Approval') &&
+            (isSuperAdmin || managedIds.has(getAreaId(r) || ''))
+        );
+
+        // Filter by area
+        if (areaFilter !== 'all') {
+            processedRequests = processedRequests.filter(r => getAreaId(r) === areaFilter);
+        }
+    
+        // Filter by search query
+        if (searchQuery.trim() !== '') {
+            processedRequests = processedRequests.filter(r => r.userName.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+    
+        // Sort
+        processedRequests.sort((a, b) => {
+            const dateA = new Date(a.requestedStartDate).getTime();
+            const dateB = new Date(b.requestedStartDate).getTime();
+            // FIX: Corrected a typo in the sort logic where 'b' (an object) was used instead of 'dateB' (a number).
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+
+        return processedRequests;
+    }, [requests, user, areaFilter, searchQuery, sortOrder]);
+
+    const handleSelectionChange = (id: string, isSelected: boolean) => {
+        setSelectedRequestIds(prev => {
+            const newSet = new Set(prev);
+            if (isSelected) {
+                newSet.add(id);
+            } else {
+                newSet.delete(id);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = (areAllSelected: boolean) => {
+        if (areAllSelected) {
+            setSelectedRequestIds(new Set());
+        } else {
+            setSelectedRequestIds(new Set(filteredAndSortedRequests.map(r => r.id)));
+        }
+    };
+
+    const handleAction = async (ids: string[], action: 'Approved' | 'Rejected') => {
+        if (ids.length === 0) return;
+        
+        try {
+            const equipmentIds = ids.filter(id => requests.find(r => r.id === id && 'requestedItems' in r));
+            const roomIds = ids.filter(id => requests.find(r => r.id === id && 'requestedRoom' in r));
+
+            if (equipmentIds.length > 0) await updateEquipmentRequestStatusApi(equipmentIds, action === 'Approved' ? 'Ready for Pickup' : 'Rejected');
+            if (roomIds.length > 0) await updateRoomRequestStatusApi(roomIds, action === 'Approved' ? 'Ready for Check-in' : 'Rejected');
+
+            setActionMessage(`Successfully ${action.toLowerCase()} ${ids.length} request(s).`);
+            setTimeout(() => setActionMessage(''), 3000);
+            setSelectedRequestIds(new Set()); // Clear selection
+            fetchData(); // Refresh data
+        } catch (err) {
+            setError(`Failed to ${action.toLowerCase()} requests.`);
+        }
+    };
+    
+    const handleViewDetails = (request: AnyRequest) => {
+        setSelectedRequest(request);
+    };
+
+    const handleCloseModal = () => {
+        setSelectedRequest(null);
+    };
+
+    const areaFilterOptions = useMemo(() => {
+        const baseOptions = [{ value: 'all', label: 'All Areas' }];
+
+        let relevantAreas: Area[] = [];
+        if (user?.role === 'superadmin') {
+            relevantAreas = areas;
+        } else if (user?.role === 'admin' && user.managedAreaIds) {
+            const managedIds = new Set(user.managedAreaIds);
+            relevantAreas = areas.filter(a => managedIds.has(a.id));
+        }
+        
+        return [
+            ...baseOptions,
+            ...relevantAreas.map(a => ({ value: a.id, label: a.name }))
+        ];
+    }, [areas, user]);
+
+    return (
+        <div className="container mx-auto p-6">
+            <Link to="/" target="_self" className="inline-flex items-center text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-500 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Dashboard
+            </Link>
+
+            <div className="flex justify-between items-center mb-1">
+                <h1 className="text-3xl font-bold dark:text-white">Requests ready for approval</h1>
+                <Link to="/all-requests" target="_self">
+                    <Button className="!w-auto">View All Requests</Button>
+                </Link>
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+                Showing {filteredAndSortedRequests.length} request(s).
+            </p>
+
+            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <Input 
+                            label="Search by name"
+                            id="search-requests"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="e.g., Bob Williams"
+                            icon={<SearchIcon className="w-5 h-5" />}
+                        />
+                    </div>
+                    <div>
+                        <Select
+                            label="Filter by area"
+                            id="area-filter"
+                            value={areaFilter}
+                            onChange={(e) => setAreaFilter(e.target.value)}
+                            options={areaFilterOptions}
+                        />
+                    </div>
+                        <div>
+                        <Select
+                            label="Sort by date"
+                            id="sort-order"
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+                            options={[
+                                { value: 'newest', label: 'Newest First' },
+                                { value: 'oldest', label: 'Oldest First' },
+                            ]}
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-start pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <ToggleSwitch
+                        id="auto-approve-toggle"
+                        label="Auto-Approve New Requests"
+                        enabled={autoApproveEnabled}
+                        onChange={setAutoApproveEnabled}
+                    />
+                </div>
+            </div>
+
+            {actionMessage && <div className="mb-4 p-3 rounded-md bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">{actionMessage}</div>}
+            {error && <div className="mb-4 p-3 rounded-md bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">{error}</div>}
+            
+            {isLoading ? (
+                <p className="dark:text-white text-center">Loading Requests...</p>
+            ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-x-auto">
+                    <RequestManagementTable
+                        requests={filteredAndSortedRequests}
+                        areasMap={areasMap}
+                        usersMap={usersMap}
+                        selectedIds={selectedRequestIds}
+                        onSelectionChange={handleSelectionChange}
+                        onSelectAll={handleSelectAll}
+                        onApprove={ids => handleAction(ids, 'Approved')}
+                        onReject={ids => handleAction(ids, 'Rejected')}
+                        onRowClick={handleViewDetails}
+                    />
+                </div>
+            )}
+            {selectedRequest && (
+                <ReservationDetailsModal 
+                    reservation={selectedRequest}
+                    onClose={handleCloseModal}
+                />
+            )}
+        </div>
+    );
+};
+
+export default RequestsPage;

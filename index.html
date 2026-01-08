@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTjnrTFy093ow4u_cYqfjHDWz120-MGeLs_2w&s" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CCAD PIMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Helvetica', 'Verdana', 'Arial', 'sans-serif'],
+              menu: ['Helvetica', 'Verdana', 'Arial', 'sans-serif'],
+              heading: ['Helvetica', 'Verdana', 'Arial', 'sans-serif'],
+            },
+            fontSize: {
+              'body': ['12px', '25px'], // Size 12px, Line-height 25px
+              'menu': ['13.68px', '13.68px'],
+              'h2-sm': ['20px', '26px'],
+              'h2-md': ['25px', '26px'],
+              'h2-lg': ['30px', '26px'],
+            },
+            colors: {
+              'ccad-black': '#000000',
+              'ccad-white': '#ffffff',
+              'ccad-text-primary': '#313131',
+              'ccad-text-secondary': '#757575',
+              'ccad-red': '#880000',
+              'ccad-bg-light': '#ececec',
+              'ccad-bg-medium': '#e6e6e6',
+              'ccad-bg-sage': '#dae0d6',
+              
+              // Extended palette for UI states
+              'up-maroon': {
+                50: '#fef2f2',
+                100: '#fee2e2',
+                200: '#fecaca',
+                300: '#fca5a5',
+                400: '#f87171',
+                500: '#ef4444',
+                600: '#dc2626',
+                700: '#880000', // Official CCAD Red
+                800: '#991b1b',
+                900: '#7f1d1d',
+              },
+              'up-gold': {
+                100: '#fffbeb',
+                500: '#f59e0b',
+              },
+              'up-green': {
+                100: '#f0fdf4',
+                300: '#86efac',
+                600: '#16a34a',
+                800: '#166534',
+                900: '#14532d',
+              },
+              slate: {
+                50: '#f8fafc',
+                100: '#f1f5f9',
+                200: '#e2e8f0',
+                300: '#cbd5e1',
+                400: '#94a3b8',
+                500: '#64748b',
+                600: '#475569',
+                700: '#334155',
+                800: '#1e293b',
+                900: '#0f172a',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Helvetica', 'Verdana', 'Arial', 'sans-serif';
+        font-size: 14px;
+        color: #313131;
+        -webkit-font-smoothing: antialiased;
+      }
+      
+      h1, h2, h3, h4, h5, h6 {
+        color: #000000;
+        font-family: 'Helvetica', 'Verdana', 'Arial', 'sans-serif;
+      }
+
+      .nav-link, .menu-tab {
+        font-family: 'Helvetica', 'Verdana', 'Arial', 'sans-serif';
+        font-size: 13.68px;
+        font-weight: 700;
+        padding: 0 20px;
+        color: #000000;
+        cursor: pointer;
+      }
+
+      .nav-link:hover, .menu-tab:hover {
+        color: #880000;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^6.25.1",
+    "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-50 dark:bg-slate-900">
+    <div id="root"></div>
+    <script type="module" src="/frontend/index.tsx"></script>
+  </body>
+</html>
