@@ -83,38 +83,38 @@ const EquipmentCatalog: React.FC<EquipmentCatalogProps> = ({ inventory, areas, i
                         const isAvailable = item.availabilityStatus === 'Available';
 
                         return (
-                        <Card key={item.id} className="!p-0 !max-w-none flex flex-col md:flex-row transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                            <Card key={item.id} className="!p-0 !max-w-none flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                             {item.photoUrl ?
-                                <img src={item.photoUrl} alt={item.name} className="h-48 w-full md:h-auto md:w-1/3 object-cover rounded-t-xl md:rounded-t-none md:rounded-l-xl" /> :
-                                <div className="h-48 w-full md:h-auto md:w-1/3 bg-slate-200 dark:bg-slate-700 rounded-t-xl md:rounded-t-none md:rounded-l-xl flex items-center justify-center text-slate-500 text-center p-2">No Image</div>
+                                <img src={item.photoUrl} alt={item.name} className="h-48 w-full object-cover rounded-t-xl" /> :
+                                <div className="h-48 w-full bg-slate-200 dark:bg-slate-700 rounded-t-xl flex items-center justify-center text-slate-500 text-center p-2">No Image</div>
                             }
                             <div className="p-4 flex flex-col justify-between flex-grow">
                                 <div>
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="font-bold text-lg dark:text-white">{item.name}</p>
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex-grow">
+                                            <p className="font-bold text-lg dark:text-white mb-1">{item.name}</p>
                                             <p className="text-sm text-slate-500 dark:text-slate-400">{areasMap.get(item.areaId) || 'Unknown Area'}</p>
                                         </div>
                                         <AvailabilityBadge status={item.availabilityStatus} />
                                     </div>
-                                    <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+                                    <div className="text-sm text-slate-600 dark:text-slate-300 mt-3">
                                         Total available items: <span className="font-semibold">{item.availableForDates}</span>
                                     </div>
                                 </div>
-                                <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                                <div className="pt-4 flex flex-row gap-2">
                                     <Button 
-                                        className="!w-full !py-2 !px-4 !bg-slate-200 !text-slate-800 hover:!bg-slate-300 dark:!bg-slate-600 dark:!text-white dark:hover:!bg-slate-500"
+                                        className="!flex-1 !py-0.5 !px-3 !text-xs !bg-slate-200 !text-slate-800 hover:!bg-slate-300 dark:!bg-slate-600 dark:!text-white dark:hover:!bg-slate-500 !rounded-full !h-8"
                                         onClick={() => onViewDetailsClick(item)}
                                     >
-                                        Details
+                                        DETAILS
                                     </Button>
                                     <Button 
-                                        className="!w-full !py-2 !px-4"
+                                        className="!flex-1 !py-0.5 !px-3 !text-xs !bg-red-700 hover:!bg-red-800 !text-white !rounded-full !h-8"
                                         onClick={() => onSelectInstances(item)}
                                         disabled={!canAddMore || !isAvailable}
                                         title={!isAvailable ? 'Item is unavailable for the selected dates.' : (!canAddMore ? `All available instances are in the cart.` : 'Add to cart')}
                                     >
-                                        Add to Cart
+                                        ADD TO CART
                                     </Button>
                                 </div>
                             </div>

@@ -48,53 +48,57 @@ const CatalogPage: React.FC = () => {
     useEffect(() => {
         const fetchStaticData = async () => {
             try {
+                console.log('Fetching static data: areas and settings...');
                 const [areasData, settingsData] = await Promise.all([
                     getAreasApi(),
                     getSettingsApi(),
                 ]);
+                console.log('Fetched areas:', areasData);
                 setAreas(areasData);
+                console.log('Fetched settings:', settingsData);
                 setSettings(settingsData);
             } catch (err) {
-                setError('Failed to load page essentials.'); // More specific error
+                console.error('Error fetching static data:', err);
+                setError('Failed to load page essentials.');
             }
         };
         fetchStaticData();
-    }, []); // Runs once on mount
+    }, []);
 
     // Effect for fetching catalog data when dates or tab change
-    useEffect(() => {
-        const fetchCatalogData = async () => {
-            if (new Date(endDate) < new Date(startDate)) {
-                setEquipmentInventory([]);
-                setRoomInventory([]);
-                setError("End date cannot be before start date.");
-                return;
+useEffect(() => {
+    const fetchCatalogData = async () => {
+        if (new Date(endDate) < new Date(startDate)) {
+            setEquipmentInventory([]);
+            setRoomInventory([]);
+            setError("End date cannot be before start date.");
+            return;
+        }
+        
+        setIsLoading(true);
+        setError('');
+        try {
+            console.log(`Fetching catalog data for tab: ${activeTab}, from ${startDate} to ${endDate}`);
+            if (activeTab === 'equipment') {
+                const inventoryData = await getInventoryCatalogApi(startDate, endDate);
+                console.log('Fetched equipment data:', inventoryData);
+                setEquipmentInventory(inventoryData);
+            } else {
+                const roomData = await getRoomCatalogApi(startDate, endDate);
+                console.log('Fetched room data:', roomData);
+                setRoomInventory(roomData);
             }
-            
-            setIsLoading(true);
-            setError('');
-            try {
-                if (activeTab === 'equipment') {
-                    const inventoryData = await getInventoryCatalogApi(startDate, endDate);
-                    setEquipmentInventory(inventoryData);
-                } else {
-                    const roomData = await getRoomCatalogApi(startDate, endDate);
-                    setRoomInventory(roomData);
-                }
-            } catch (err) {
-                setError('Failed to load catalog data.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
+        } catch (err) {
+            console.error('Error fetching catalog data:', err);
+            setError('Failed to load catalog data.');
+        } finally {
+            setIsLoading(false);
+            console.log('Finished fetching catalog data.');
+        }
+    };
 
-        // Debounce the fetch to avoid excessive calls
-        const handler = setTimeout(() => {
-            fetchCatalogData();
-        }, 300);
-
-        return () => clearTimeout(handler);
-    }, [startDate, endDate, activeTab]); // Re-fetches only when these change
+    fetchCatalogData();
+}, [startDate, endDate, activeTab]);
 
     useEffect(() => {
         setEquipmentCart(new Map());
@@ -175,7 +179,7 @@ const CatalogPage: React.FC = () => {
     return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
             {/* Sidebar / Cart */}
-            <aside className={`fixed inset-y-0 right-0 z-50 w-full sm:w-96 lg:relative lg:w-auto transition-transform duration-300 transform ${isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
+            <aside className={`fixed inset-y-0 right-0 z-50 w-full ${isSidebarCollapsed ? 'sm:w-16 lg:w-16' : 'sm:w-60 lg:w-60'} lg:relative transition-all duration-300 transform ${isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
                 <Cart
                     items={activeCart}
                     availability={availability}

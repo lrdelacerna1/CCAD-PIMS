@@ -45,8 +45,39 @@ const AddItemModal: React.FC<{
 }> = ({ manageableAreas, onClose, onProceed, initialData }) => {
     const [name, setName] = useState(initialData?.name || '');
     const [areaId, setAreaId] = useState(initialData?.areaId || manageableAreas[0]?.id || '');
+    const [photoUrl, setPhotoUrl] = useState(initialData?.photoUrl || '');
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(initialData?.photoUrl || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setPhotoFile(file);
+            setPhotoUrl(''); // Clear URL when file is selected
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPhotoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const url = e.target.value;
+        setPhotoUrl(url);
+        setPhotoFile(null); // Clear file when URL is entered
+        setPhotoPreview(url || null);
+    };
+
+    const handleRemovePhoto = () => {
+        setPhotoFile(null);
+        setPhotoUrl('');
+        setPhotoPreview(null);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,11 +88,31 @@ const AddItemModal: React.FC<{
         setIsLoading(true);
         setError('');
         try {
+            let finalPhotoUrl = photoUrl.trim();
+            
+            // If a file was uploaded, convert to base64
+            if (photoFile) {
+                const reader = new FileReader();
+                finalPhotoUrl = await new Promise((resolve, reject) => {
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(photoFile);
+                });
+            }
+
             let item: InventoryItem;
             if (initialData) {
-                item = await updateInventoryItemApi(initialData.id, { name: name.trim(), areaId });
+                item = await updateInventoryItemApi(initialData.id, { 
+                    name: name.trim(), 
+                    areaId,
+                    photoUrl: finalPhotoUrl || undefined
+                });
             } else {
-                item = await createInventoryItemApi({ name: name.trim(), areaId });
+                item = await createInventoryItemApi({ 
+                    name: name.trim(), 
+                    areaId,
+                    photoUrl: finalPhotoUrl || undefined
+                });
             }
             onProceed(item);
         } catch (err: any) {
@@ -100,6 +151,72 @@ const AddItemModal: React.FC<{
                                 options={manageableAreas.map(a => ({ value: a.id, label: a.name }))}
                                 required
                             />
+                            
+                            {/* Photo Upload Section */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    <PhotoIcon className="w-4 h-4 inline mr-2" />
+                                    Equipment Photo (Optional)
+                                </label>
+                                
+                                {/* Photo Preview */}
+                                {photoPreview && (
+                                    <div className="mb-3 relative">
+                                        <img 
+                                            src={photoPreview} 
+                                            alt="Preview" 
+                                            className="w-full h-32 object-cover rounded-lg border border-slate-300 dark:border-slate-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRemovePhoto}
+                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                        >
+                                            <XIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                {/* File Upload */}
+                                <div className="mb-2">
+                                    <label 
+                                        htmlFor="photo-file" 
+                                        className="flex items-center justify-center w-full px-4 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer hover:border-sky-500 dark:hover:border-sky-500 transition-colors"
+                                    >
+                                        <PhotoIcon className="w-5 h-5 mr-2 text-slate-500" />
+                                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                                            {photoFile ? photoFile.name : 'Choose a file or drag here'}
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="file"
+                                        id="photo-file"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                    />
+                                </div>
+                                
+                                {/* Divider */}
+                                <div className="relative py-2">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t border-slate-300 dark:border-slate-600"></div>
+                                    </div>
+                                    <div className="relative flex justify-center">
+                                        <span className="bg-white dark:bg-slate-800 px-2 text-xs text-slate-500">OR</span>
+                                    </div>
+                                </div>
+                                
+                                {/* URL Input */}
+                                <input
+                                    type="url"
+                                    id="item-photo-url"
+                                    value={photoUrl}
+                                    onChange={handleUrlChange}
+                                    placeholder="Enter image URL"
+                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+                                />
+                            </div>
                         </div>
                     </div>
                     <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50">

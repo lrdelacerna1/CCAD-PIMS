@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance } from '../../types';
 import { Button } from '../ui/Button';
@@ -34,7 +33,6 @@ export const Cart: React.FC<CartProps> = ({
     const isEquipment = type === 'equipment' && items instanceof Map;
     const isRoom = type === 'rooms' && items && !(items instanceof Map);
 
-    // FIX: Added explicit return type to useMemo to resolve 'unknown' property access errors in the JSX below.
     const equipmentItemGroups = useMemo<{ item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]>(() => {
         if (isEquipment && items instanceof Map) {
             return Array.from(items.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[];
@@ -42,12 +40,10 @@ export const Cart: React.FC<CartProps> = ({
         return [];
     }, [isEquipment, items]);
 
-    // FIX: Explicitly cast roomItem for safe property access.
     const roomItem = isRoom ? items as { type: RoomTypeForCatalog, instance: RoomInstance } : null;
     
     const totalItemCount = useMemo(() => {
         if (isEquipment && items instanceof Map) {
-            // FIX: Explicitly typed the reduce accumulator and current value to avoid 'unknown' property access errors.
             return Array.from(items.values()).reduce((sum, group: { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }) => sum + group.instances.size, 0);
         }
         return isRoom ? 1 : 0;
@@ -55,9 +51,9 @@ export const Cart: React.FC<CartProps> = ({
 
     if (isCollapsed) {
         return (
-            <div className="bg-white dark:bg-slate-800 h-full p-4 flex flex-col items-center justify-between border-r dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 h-full w-16 p-4 flex flex-col items-center justify-between border-l dark:border-slate-700">
                 <button onClick={onToggleCollapse} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">
-                    <ChevronDoubleRightIcon className="w-6 h-6 text-slate-600 dark:text-slate-300" />
+                    <ChevronDoubleLeftIcon className="w-6 h-6 text-slate-600 dark:text-slate-300" />
                 </button>
                 <div className="relative">
                     <ShoppingCartIcon className="w-8 h-8 text-slate-600 dark:text-slate-300" />
@@ -73,9 +69,9 @@ export const Cart: React.FC<CartProps> = ({
     }
 
     return (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-t-lg shadow-lg flex flex-col h-full border-t border-x dark:border-slate-700 lg:border-r lg:border-t-0 lg:border-x-0 lg:rounded-none">
-            <div className="flex justify-between items-center border-b dark:border-slate-600 pb-3 mb-4">
-                <h2 className="text-2xl font-bold dark:text-white">Build Your Request</h2>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-t-lg shadow-lg flex flex-col h-full border-t border-x dark:border-slate-700 lg:border-r lg:border-t-0 lg:border-x-0 lg:rounded-none">
+            <div className="flex justify-between items-center border-b dark:border-slate-600 pb-3 mb-4 max-w-[200px]">
+                <h2 className="text-xl font-bold dark:text-white">Build Your Request</h2>
                 {onToggleCollapse && (
                      <button onClick={onToggleCollapse} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 hidden lg:block">
                         <ChevronDoubleLeftIcon className="w-6 h-6 text-slate-600 dark:text-slate-300" />
@@ -88,19 +84,23 @@ export const Cart: React.FC<CartProps> = ({
                 )}
             </div>
             
-            <div className="space-y-4 mb-6">
+            <div className="space-y-4 mb-6 max-w-[200px]">
                 <p className="block text-sm font-medium text-slate-900 dark:text-white">Select a Date Range</p>
-                <Input label="Start Date" id="sidebar-start-date" type="date" value={startDate} onChange={e => onStartDateChange(e.target.value)} min={minDate} />
-                <Input label="End Date" id="sidebar-end-date" type="date" value={endDate} onChange={e => onEndDateChange(e.target.value)} min={startDate} />
+                <div>
+                    <Input label="Start Date" id="sidebar-start-date" type="date" value={startDate} onChange={e => onStartDateChange(e.target.value)} min={minDate} />
+                </div>
+                <div>
+                    <Input label="End Date" id="sidebar-end-date" type="date" value={endDate} onChange={e => onEndDateChange(e.target.value)} min={startDate} />
+                </div>
             </div>
 
-            <h3 className="text-xl font-semibold dark:text-white mb-3">
+            <h3 className="text-xl font-semibold dark:text-white mb-3 max-w-[200px]">
                 Request Cart
             </h3>
-            <div className="flex-grow flex flex-col min-h-0">
+            <div className="flex-grow flex flex-col min-h-0 max-w-[200px]">
                 {totalItemCount === 0 ? (
                     <div className="flex-grow flex items-center justify-center py-8 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
-                        <p className="text-slate-500 dark:text-slate-400">Your cart is empty.</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm">Your cart is empty.</p>
                     </div>
                 ) : (
                     <div className="overflow-y-auto space-y-3 pr-2 -mr-2 flex-grow">
@@ -108,7 +108,6 @@ export const Cart: React.FC<CartProps> = ({
                             <div key={item.id} className="p-3 rounded-md bg-slate-50 dark:bg-slate-700/50">
                                 <p className="font-semibold text-slate-800 dark:text-slate-200">{item.name} ({instances.size})</p>
                                 <div className="mt-2 flex flex-wrap gap-2">
-                                    {/* FIX: Cast inst to InventoryInstance to resolve 'unknown' type property access errors. */}
                                     {Array.from(instances.values()).map((inst) => {
                                         const i = inst as InventoryInstance;
                                         const isAvailable = availability.get(i.id) ?? true;
@@ -142,10 +141,10 @@ export const Cart: React.FC<CartProps> = ({
                     </div>
                 )}
             </div>
-            <div className="mt-6 border-t dark:border-slate-600 pt-4">
+            <div className="mt-6 border-t dark:border-slate-600 pt-4 max-w-[200px]">
                 {isLoading && <p className="text-sm text-center text-slate-500 dark:text-slate-400">Checking availability...</p>}
-                <Button onClick={onFinalize} disabled={!isSubmittable || isLoading}>
-                    Finalize Request ({totalItemCount})
+                <Button onClick={onFinalize} disabled={!isSubmittable || isLoading} className="!whitespace-nowrap !text-xs !h-8 !py-1">
+                    FINALIZE REQUEST ({totalItemCount})
                 </Button>
             </div>
         </div>

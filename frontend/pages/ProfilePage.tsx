@@ -7,7 +7,7 @@ import { getAreasApi } from '../../backend/api/areas';
 import { Area } from '../types';
 
 const ProfilePage: React.FC = () => {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, signOut, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -106,7 +106,7 @@ const ProfilePage: React.FC = () => {
                             <Button onClick={handleCancel} variant="secondary" className="!w-auto flex-1">Cancel</Button>
                     </div>
                 )}
-                {!isEditing && <Button onClick={logout} variant="danger" className="!w-auto flex-1 md:flex-none">Logout</Button>}
+                {!isEditing && <Button onClick={signOut} variant="danger" className="!w-auto flex-1 md:flex-none">Logout</Button>}
             </div>
         </div>
 
