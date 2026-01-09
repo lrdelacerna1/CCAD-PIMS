@@ -1,88 +1,125 @@
 
+import {
+    collection,
+    getDocs,
+    getDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    query,
+    where,
+    writeBatch,
+    Query,
+    DocumentData
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import {
+    RoomType,
+    RoomInstance,
+    RoomTypeWithQuantity,
+    RoomAvailabilityRequest,
+    RoomInstanceAvailabilityResult,
+    RoomTypeForCatalog,
+    AvailabilityStatus
+} from '../../frontend/types';
 
-import { RoomType, RoomInstance, RoomTypeWithQuantity, RoomAvailabilityRequest, RoomInstanceAvailabilityResult, RoomTypeForCatalog, AvailabilityStatus } from '../../frontend/types';
-// FIX: Import 'roomRequests' instead of the non-existent 'reservations'.
-import { roomTypes, roomInstances, roomRequests } from '../db/mockDb';
-
-const uuidv4 = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = (Math.random() * 16) | 0,
-            v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
-};
+const roomTypesCollection = collection(db, "roomTypes");
+const roomInstancesCollection = collection(db, "roomInstances");
+const roomRequestsCollection = collection(db, "roomRequests");
 
 export class RoomService {
+
+    private static async _getDocs(q: Query<DocumentData>) {
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
     static async getRoomTypes(): Promise<RoomTypeWithQuantity[]> {
-        const typesWithQuantities: RoomTypeWithQuantity[] = roomTypes.map(type => {
-            const instances = roomInstances.filter(inst => inst.roomTypeId === type.id);
+        const types = await this._getDocs(query(roomTypesCollection));
+        const instances = await this._getDocs(query(roomInstancesCollection));
+
+        const instancesByRoomTypeId = instances.reduce((acc, inst) => {
+            const roomTypeId = (inst as any).roomTypeId;
+            if (!acc[roomTypeId]) {
+                acc[roomTypeId] = [];
+            }
+            acc[roomTypeId].push(inst);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        const typesWithQuantities: RoomTypeWithQuantity[] = types.map(type => {
+            const roomInstances = instancesByRoomTypeId[(type as any).id] || [];
             const quantity = {
-                total: instances.length,
-                available: instances.filter(i => i.status === 'Available').length,
-                inUse: instances.filter(i => i.status === 'In Use').length,
-                underMaintenance: instances.filter(i => i.status === 'Under Maintenance').length,
+                total: roomInstances.length,
+                available: roomInstances.filter(i => i.status === 'Available').length,
+                inUse: roomInstances.filter(i => i.status === 'In Use').length,
+                underMaintenance: roomInstances.filter(i => i.status === 'Under Maintenance').length,
             };
-            return { ...type, quantity };
+            return { ...type, quantity } as RoomTypeWithQuantity;
         });
-        return JSON.parse(JSON.stringify(typesWithQuantities));
+
+        return typesWithQuantities;
     }
 
     static async getRoomTypesForCatalog(startDate: string, endDate: string): Promise<RoomTypeForCatalog[]> {
-        // Filter out hidden rooms
-        const baseRoomTypes = (await this.getRoomTypes()).filter(rt => !rt.isHidden);
+        const baseRoomTypes = (await this.getRoomTypes()).filter(rt => !(rt as any).isHidden);
 
         const datesInRange: string[] = [];
-        let currentDate = new Date(startDate + 'T00:00:00Z');
-        const lastDate = new Date(endDate + 'T00:00:00Z');
-        if (lastDate >= currentDate) {
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        if (startDate && endDate) {
+            let currentDate = new Date(startDate + 'T00:00:00Z');
+            const lastDate = new Date(endDate + 'T00:00:00Z');
+            if (lastDate >= currentDate) {
+                while (currentDate <= lastDate) {
+                    datesInRange.push(currentDate.toISOString().split('T')[0]);
+                    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+                }
             }
         }
-        
+
+        const allInstances = await this._getDocs(query(roomInstancesCollection));
+        const allReservations = await this._getDocs(query(
+            roomRequestsCollection,
+            where('status', 'in', ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue']),
+            where('requestedEndDate', '>=', startDate || '0')
+        ));
+
         const catalogItems: RoomTypeForCatalog[] = [];
         for (const roomType of baseRoomTypes) {
-            const allInstances = roomInstances.filter(inst => inst.roomTypeId === roomType.id);
-
+            const instancesOfThisType = allInstances.filter(inst => (inst as any).roomTypeId === (roomType as any).id);
             let availableForDates = 0;
+
             if (datesInRange.length > 0) {
-                // An instance is available for the whole range if it's not blocked and not specifically reserved on any of those dates.
-                const availableThroughoutInstances = allInstances.filter(instance => {
-                    const isPhysicallyAvailable = instance.status === 'Available' &&
-                        !(instance.blockedDates && instance.blockedDates.some(d => datesInRange.includes(d)));
+                const availableThroughoutInstances = instancesOfThisType.filter(instance => {
+                    const isPhysicallyAvailable = (instance as any).status === 'Available' &&
+                        !((instance as any).blockedDates && (instance as any).blockedDates.some((d: string) => datesInRange.includes(d)));
                     if (!isPhysicallyAvailable) return false;
 
-                    const isSpecificallyReserved = roomRequests.some(req =>
-                        req.instanceId === instance.id &&
-                        ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue'].includes(req.status) &&
-                        (req.requestedStartDate <= datesInRange[datesInRange.length - 1] && req.requestedEndDate >= datesInRange[0])
+                    const isSpecificallyReserved = allReservations.some(req =>
+                        (req as any).instanceId === (instance as any).id &&
+                        ((req as any).requestedStartDate <= datesInRange[datesInRange.length - 1] && (req as any).requestedEndDate >= datesInRange[0])
                     );
                     if (isSpecificallyReserved) return false;
 
                     return true;
                 });
-                
-                // For the pool of available instances, account for generic reservations (those without an instanceId).
-                // Find the peak number of generic reservations on any day in the range.
+
                 let maxGenericReservations = 0;
                 for (const date of datesInRange) {
-                    const genericReservationsOnDate = roomRequests.filter(req =>
-                        !req.instanceId &&
-                        req.requestedRoom.roomTypeId === roomType.id &&
-                        req.requestedStartDate <= date && req.requestedEndDate >= date &&
-                        ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue'].includes(req.status)
+                    const genericReservationsOnDate = allReservations.filter(req =>
+                        !(req as any).instanceId &&
+                        (req as any).requestedRoom.roomTypeId === (roomType as any).id &&
+                        (req as any).requestedStartDate <= date && (req as any).requestedEndDate >= date
                     ).length;
 
                     if (genericReservationsOnDate > maxGenericReservations) {
                         maxGenericReservations = genericReservationsOnDate;
                     }
                 }
-                
-                availableForDates = Math.max(0, availableThroughoutInstances.length - maxGenericReservations);
 
+                availableForDates = Math.max(0, availableThroughoutInstances.length - maxGenericReservations);
             } else {
-                availableForDates = allInstances.filter(i => i.status === 'Available').length;
+                availableForDates = instancesOfThisType.filter(i => (i as any).status === 'Available').length;
             }
 
             let availabilityStatus: AvailabilityStatus;
@@ -96,118 +133,127 @@ export class RoomService {
 
             catalogItems.push({ ...roomType, availabilityStatus, availableForDates });
         }
-        
-        return JSON.parse(JSON.stringify(catalogItems));
+
+        return catalogItems;
     }
 
     static async createRoomType(data: { name: string; areaId: string }): Promise<RoomType> {
-        if (roomTypes.some(rt => rt.name.toLowerCase() === data.name.toLowerCase() && rt.areaId === data.areaId)) {
+        const q = query(roomTypesCollection, where("name", "==", data.name), where("areaId", "==", data.areaId));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
             throw new Error(`A room type with the name "${data.name}" already exists in this area.`);
         }
-        const newRoomType: RoomType = {
-            id: `room-type-${uuidv4()}`,
+        const newRoomTypeData = {
             ...data,
             isHidden: false,
         };
-        roomTypes.push(newRoomType);
-        return { ...newRoomType };
+        const docRef = await addDoc(roomTypesCollection, newRoomTypeData);
+        return { id: docRef.id, ...newRoomTypeData } as RoomType;
     }
 
     static async updateRoomType(id: string, updates: { name: string; areaId: string; isHidden?: boolean }): Promise<RoomType> {
-        const typeIndex = roomTypes.findIndex(rt => rt.id === id);
-        if (typeIndex === -1) {
+        const typeRef = doc(db, "roomTypes", id);
+        const typeSnap = await getDoc(typeRef);
+        if (!typeSnap.exists()) {
             throw new Error('Room type not found.');
         }
-        if (roomTypes.some(rt => rt.name.toLowerCase() === updates.name.toLowerCase() && rt.areaId === updates.areaId && rt.id !== id)) {
+        const wasHidden = typeSnap.data().isHidden;
+
+        const q = query(roomTypesCollection, where("name", "==", updates.name), where("areaId", "==", updates.areaId));
+        const collisionSnapshot = await getDocs(q);
+        if (!collisionSnapshot.empty && collisionSnapshot.docs[0].id !== id) {
             throw new Error(`A room type with the name "${updates.name}" already exists in this area.`);
         }
 
-        const wasHidden = roomTypes[typeIndex].isHidden;
-        roomTypes[typeIndex] = { ...roomTypes[typeIndex], ...updates };
+        await updateDoc(typeRef, updates as any);
 
-        // Side effects for hiding/unhiding
         if (updates.isHidden && !wasHidden) {
-            // Room type is being hidden. Set all instances to "Under Maintenance"
-            roomInstances.forEach(inst => {
-                if (inst.roomTypeId === id) {
-                    inst.status = 'Under Maintenance';
-                }
+            const batch = writeBatch(db);
+            const instancesQuery = query(roomInstancesCollection, where("roomTypeId", "==", id));
+            const instancesSnapshot = await getDocs(instancesQuery);
+            instancesSnapshot.forEach(instanceDoc => {
+                batch.update(instanceDoc.ref, { status: 'Under Maintenance' });
             });
+            await batch.commit();
         }
 
-        return { ...roomTypes[typeIndex] };
+        const updatedDoc = await getDoc(typeRef);
+        return { id: updatedDoc.id, ...updatedDoc.data() } as RoomType;
     }
 
     static async deleteRoomType(id: string): Promise<void> {
-        const index = roomTypes.findIndex(rt => rt.id === id);
-        if (index !== -1) {
-            roomTypes.splice(index, 1);
-            let i = roomInstances.length;
-            while (i--) {
-                if (roomInstances[i].roomTypeId === id) {
-                    roomInstances.splice(i, 1);
-                }
-            }
-        }
+        const batch = writeBatch(db);
+        const typeRef = doc(db, "roomTypes", id);
+        batch.delete(typeRef);
+
+        const instancesQuery = query(roomInstancesCollection, where("roomTypeId", "==", id));
+        const instancesSnapshot = await getDocs(instancesQuery);
+        instancesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
     }
 
     static async getInstancesByRoomTypeId(roomTypeId: string): Promise<RoomInstance[]> {
-        const instances = roomInstances.filter(inst => inst.roomTypeId === roomTypeId);
-        return JSON.parse(JSON.stringify(instances));
+        const q = query(roomInstancesCollection, where("roomTypeId", "==", roomTypeId));
+        return await this._getDocs(q) as RoomInstance[];
     }
 
     static async createRoomInstance(data: Omit<RoomInstance, 'id'>): Promise<RoomInstance> {
-        const newInstance: RoomInstance = {
-            id: `room-inst-${uuidv4()}`,
-            ...data,
-        };
-        roomInstances.push(newInstance);
-        return { ...newInstance };
+        const docRef = await addDoc(roomInstancesCollection, data);
+        return { id: docRef.id, ...data } as RoomInstance;
     }
 
     static async updateRoomInstance(id: string, updates: Partial<Omit<RoomInstance, 'id' | 'roomTypeId'>>): Promise<RoomInstance> {
-        const index = roomInstances.findIndex(inst => inst.id === id);
-        if (index === -1) {
-            throw new Error('Room instance not found.');
-        }
-        roomInstances[index] = { ...roomInstances[index], ...updates };
-        return { ...roomInstances[index] };
+        const instanceRef = doc(db, "roomInstances", id);
+        await updateDoc(instanceRef, updates);
+        const updatedDoc = await getDoc(instanceRef);
+        return { id: updatedDoc.id, ...updatedDoc.data() } as RoomInstance;
     }
 
     static async deleteRoomInstance(id: string): Promise<void> {
-        const index = roomInstances.findIndex(inst => inst.id === id);
-        if (index !== -1) {
-            roomInstances.splice(index, 1);
-        }
+        const instanceRef = doc(db, "roomInstances", id);
+        await deleteDoc(instanceRef);
     }
-    
+
     static async checkRoomAvailability(request: RoomAvailabilityRequest): Promise<RoomInstanceAvailabilityResult[]> {
         const { startDate, endDate, roomTypeIds } = request;
         const results: RoomInstanceAvailabilityResult[] = [];
 
         const datesInRange: string[] = [];
-        let currentDate = new Date(startDate + 'T00:00:00Z');
-        const lastDate = new Date(endDate + 'T00:00:00Z');
-        while (currentDate <= lastDate) {
-            datesInRange.push(currentDate.toISOString().split('T')[0]);
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        if (startDate && endDate) {
+            let currentDate = new Date(startDate + 'T00:00:00Z');
+            const lastDate = new Date(endDate + 'T00:00:00Z');
+            while (currentDate <= lastDate) {
+                datesInRange.push(currentDate.toISOString().split('T')[0]);
+                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            }
         }
+        if (datesInRange.length === 0) return [];
+
+        const allReservations = await this._getDocs(query(
+            roomRequestsCollection,
+            where('status', 'in', ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue']),
+            where('requestedEndDate', '>=', startDate)
+        ));
 
         for (const roomTypeId of roomTypeIds) {
-            const typeInfo = roomTypes.find(rt => rt.id === roomTypeId);
-            if (!typeInfo) continue;
+            const typeSnap = await getDoc(doc(db, "roomTypes", roomTypeId));
+            if (!typeSnap.exists()) continue;
+            const typeInfo = { id: typeSnap.id, ...typeSnap.data() } as RoomType;
 
-            const allInstances = roomInstances.filter(inst => inst.roomTypeId === roomTypeId);
-            
-            const availableThroughoutInstances = allInstances.filter(instance => {
-                const isPhysicallyAvailable = instance.status === 'Available' &&
-                    !(instance.blockedDates && instance.blockedDates.some(d => datesInRange.includes(d)));
+            const instancesOfRoomTypeQuery = query(roomInstancesCollection, where("roomTypeId", "==", roomTypeId));
+            const allInstancesOfRoomType = await this._getDocs(instancesOfRoomTypeQuery);
+
+            const availableThroughoutInstances = allInstancesOfRoomType.filter(instance => {
+                const isPhysicallyAvailable = (instance as any).status === 'Available' &&
+                    !((instance as any).blockedDates && (instance as any).blockedDates.some((d: string) => datesInRange.includes(d)));
                 if (!isPhysicallyAvailable) return false;
-                
-                const isSpecificallyReserved = roomRequests.some(req =>
-                    req.instanceId === instance.id &&
-                    ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue'].includes(req.status) &&
-                    (req.requestedStartDate <= datesInRange[datesInRange.length - 1] && req.requestedEndDate >= datesInRange[0])
+
+                const isSpecificallyReserved = allReservations.some(req =>
+                    (req as any).instanceId === (instance as any).id &&
+                    ((req as any).requestedStartDate <= datesInRange[datesInRange.length - 1] && (req as any).requestedEndDate >= datesInRange[0])
                 );
                 if (isSpecificallyReserved) return false;
 
@@ -216,25 +262,24 @@ export class RoomService {
 
             let maxGenericReservations = 0;
             for (const date of datesInRange) {
-                const genericReservationsOnDate = roomRequests.filter(req =>
-                    !req.instanceId &&
-                    req.requestedRoom.roomTypeId === roomTypeId &&
-                    req.requestedStartDate <= date && req.requestedEndDate >= date &&
-                    ['Pending Confirmation', 'For Approval', 'Ready for Check-in', 'Overdue'].includes(req.status)
+                const genericReservationsOnDate = allReservations.filter(req =>
+                    !(req as any).instanceId &&
+                    (req as any).requestedRoom.roomTypeId === roomTypeId &&
+                    (req as any).requestedStartDate <= date && (req as any).requestedEndDate >= date
                 ).length;
 
                 if (genericReservationsOnDate > maxGenericReservations) {
                     maxGenericReservations = genericReservationsOnDate;
                 }
             }
-            
+
             const numAvailable = Math.max(0, availableThroughoutInstances.length - maxGenericReservations);
             const availableInstances = availableThroughoutInstances.slice(0, numAvailable);
 
             results.push({
                 roomTypeId,
                 roomTypeName: typeInfo.name,
-                availableInstances,
+                availableInstances: availableInstances as RoomInstance[],
             });
         }
         return results;

@@ -1,24 +1,30 @@
-import { ReservationSettings } from '../../frontend/types';
-import { reservationSettings, saveSettings } from '../db/mockDb';
+
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { ReservationSettings } from "../../frontend/types";
+
+const SETTINGS_DOC_ID = "reservation_settings";
 
 export class SettingsService {
     static async getSettings(): Promise<ReservationSettings> {
-        return JSON.parse(JSON.stringify(reservationSettings));
+        const settingsRef = doc(db, "settings", SETTINGS_DOC_ID);
+        const settingsDoc = await getDoc(settingsRef);
+        
+        if (settingsDoc.exists()) {
+            return settingsDoc.data() as ReservationSettings;
+        } else {
+            // Return default settings if the document doesn't exist
+            return {
+                minimumLeadDays: 2,
+                penaltyAmount: 10,
+                penaltyInterval: 'per_day',
+            };
+        }
     }
     
     static async updateSettings(newSettings: Partial<ReservationSettings>): Promise<ReservationSettings> {
-        // In a real DB, you'd have validation here
-        if (newSettings.minimumLeadDays !== undefined) {
-            reservationSettings.minimumLeadDays = Math.max(0, newSettings.minimumLeadDays); // Ensure it's not negative
-        }
-        if (newSettings.penaltyAmount !== undefined) {
-            reservationSettings.penaltyAmount = Math.max(0, newSettings.penaltyAmount);
-        }
-        if (newSettings.penaltyInterval !== undefined) {
-            reservationSettings.penaltyInterval = newSettings.penaltyInterval;
-        }
-        
-        saveSettings();
-        return { ...reservationSettings };
+        const settingsRef = doc(db, "settings", SETTINGS_DOC_ID);
+        await setDoc(settingsRef, newSettings, { merge: true });
+        return this.getSettings();
     }
 }

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -6,18 +7,16 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { AuthLayout } from '../components/layout/AuthLayout';
 import { MailIcon, LockIcon, GoogleIcon } from '../components/Icons';
-import GoogleLoginMockModal from '../components/auth/GoogleLoginMockModal';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const from = location.state?.from?.pathname || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,16 +33,11 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleOpenGoogleModal = () => {
-    setIsGoogleModalOpen(true);
-  };
-
-  const handleSelectGoogleAccount = async (selectedEmail: string) => {
-    setIsGoogleModalOpen(false);
+  const handleGoogleSignIn = async () => {
     setError('');
     setIsGoogleLoading(true);
     try {
-      await loginWithGoogle(selectedEmail);
+      await signInWithGoogle();
       navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google.');
@@ -74,7 +68,7 @@ const LoginPage: React.FC = () => {
           <button
             type="button"
             disabled={isGoogleLoading}
-            onClick={handleOpenGoogleModal}
+            onClick={handleGoogleSignIn}
             className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-medium text-slate-900 focus:outline-none bg-white rounded-lg border border-slate-200 hover:bg-slate-100 hover:text-up-maroon-800 focus:z-10 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600 dark:hover:text-white dark:hover:bg-slate-700 disabled:opacity-50"
           >
             {isGoogleLoading ? (
@@ -92,12 +86,6 @@ const LoginPage: React.FC = () => {
           </p>
         </form>
       </Card>
-      
-      <GoogleLoginMockModal 
-        isOpen={isGoogleModalOpen} 
-        onClose={() => setIsGoogleModalOpen(false)} 
-        onSelectAccount={handleSelectGoogleAccount} 
-      />
     </AuthLayout>
   );
 };

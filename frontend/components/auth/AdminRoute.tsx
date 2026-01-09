@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isSuperAdmin, isAdmin } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -13,8 +13,8 @@ export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  
-  if (user.role !== 'admin' && user.role !== 'superadmin') {
+
+  if (!isSuperAdmin && !isAdmin) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 

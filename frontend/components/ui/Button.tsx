@@ -6,7 +6,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ children, isLoading = false, variant = 'primary', className, ...props }) => {
-  const baseClasses = "font-sans text-[12px] font-semibold uppercase tracking-wider leading-none rounded-[12px] h-[30px] px-4 flex items-center justify-center transition-all duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-sm box-border";
+  const baseClasses = "font-sans text-xs font-semibold uppercase tracking-wider leading-none rounded-[12px] h-[48px] px-8 flex items-center justify-center transition-all duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-sm box-border";
 
   const variantClasses = {
     primary: "bg-up-maroon-700 text-white hover:bg-up-maroon-800 focus:ring-4 focus:outline-none focus:ring-up-maroon-700/50",

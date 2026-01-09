@@ -1,5 +1,32 @@
-import { DailyAvailability, AvailabilityLevel, ItemDailyStatus } from '../../frontend/types';
-import { equipmentRequests, roomRequests, inventoryItems, inventoryInstances, roomTypes, roomInstances } from '../db/mockDb';
+
+import { 
+    collection, 
+    getDocs, 
+    query, 
+    where, 
+    Timestamp,
+    doc,
+    getDoc
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { 
+    DailyAvailability, 
+    AvailabilityLevel, 
+    ItemDailyStatus,
+    InventoryItem,
+    EquipmentRequest,
+    RoomRequest,
+    RoomType,
+    InventoryInstance,
+    RoomInstance
+} from '../../frontend/types';
+
+const equipmentRequestsCollection = collection(db, "equipmentRequests");
+const roomRequestsCollection = collection(db, "roomRequests");
+const inventoryItemsCollection = collection(db, "inventoryItems");
+const inventoryInstancesCollection = collection(db, "inventoryInstances");
+const roomTypesCollection = collection(db, "roomTypes");
+const roomInstancesCollection = collection(db, "roomInstances");
 
 export class CalendarService {
     private static getDaysInMonth(year: number, month: number): string[] {
@@ -34,32 +61,73 @@ export class CalendarService {
             let totalResources = 0;
             let bookedResources = 0;
 
-            if (resourceType === 'equipment') {
-                const itemsInArea = inventoryItems.filter(item => areaId === 'all' || item.areaId === areaId);
-                totalResources = inventoryInstances.filter(inst =>
-                    itemsInArea.some(item => item.id === inst.itemId) && inst.condition !== 'Lost/Unusable'
-                ).length;
+            const dayStart = new Date(day);
+            const dayEnd = new Date(day);
+            dayEnd.setDate(dayEnd.getDate() + 1);
 
-                const requestsOnDay = equipmentRequests.filter(req =>
-                    day >= req.requestedStartDate && day <= req.requestedEndDate &&
-                    (req.status === 'Ready for Pickup') &&
-                    // FIX: Use 'requestedItems' instead of 'requestedItem'.
-                    req.requestedItems.some(item => areaId === 'all' || item.areaId === areaId)
+            if (resourceType === 'equipment') {
+                // Total Equipment
+                let itemQuery = areaId === 'all' ? query(inventoryItemsCollection) : query(inventoryItemsCollection, where('areaId', '==', areaId));
+                const itemsSnapshot = await getDocs(itemQuery);
+                const itemIds = itemsSnapshot.docs.map(doc => doc.id);
+                
+                if (itemIds.length > 0) {
+                    const instancesQuery = query(inventoryInstancesCollection, where('itemId', 'in', itemIds), where('condition', '!=', 'Lost/Unusable'));
+                    const instancesSnapshot = await getDocs(instancesQuery);
+                    totalResources = instancesSnapshot.size;
+                }
+
+                // Booked Equipment
+                const requestsQuery = query(equipmentRequestsCollection,
+                    where('requestedStartDate', '<=', day),
+                    where('requestedEndDate', '>=', day),
+                    where('status', 'in', ['Ready for Pickup', 'Closed']),
                 );
-                bookedResources = requestsOnDay.length;
+                const requestsSnapshot = await getDocs(requestsQuery);
+
+                let relevantRequestCount = 0;
+                for (const requestDoc of requestsSnapshot.docs) {
+                    const requestData = requestDoc.data() as EquipmentRequest;
+                    if (areaId === 'all') {
+                        relevantRequestCount += requestData.requestedItems.length;
+                    } else {
+                        for (const item of requestData.requestedItems) {
+                            const itemDoc = await getDoc(doc(db, "inventoryItems", item.itemId));
+                            if (itemDoc.exists() && (itemDoc.data() as InventoryItem).areaId === areaId) {
+                                relevantRequestCount++;
+                            }
+                        }
+                    }
+                }
+                bookedResources = relevantRequestCount;
 
             } else { // rooms
-                const typesInArea = roomTypes.filter(rt => areaId === 'all' || rt.areaId === areaId);
-                totalResources = roomInstances.filter(inst =>
-                    typesInArea.some(rt => rt.id === inst.roomTypeId)
-                ).length;
+                // Total Rooms
+                let typeQuery = areaId === 'all' ? query(roomTypesCollection) : query(roomTypesCollection, where('areaId', '==', areaId));
+                const typesSnapshot = await getDocs(typeQuery);
+                const typeIds = typesSnapshot.docs.map(doc => doc.id);
+
+                if (typeIds.length > 0) {
+                    const instancesQuery = query(roomInstancesCollection, where('roomTypeId', 'in', typeIds));
+                    const instancesSnapshot = await getDocs(instancesQuery);
+                    totalResources = instancesSnapshot.size;
+                }
                 
-                const requestsOnDay = roomRequests.filter(req =>
-                    req.requestedStartDate === day &&
-                    (req.status === 'Ready for Check-in' || req.status === 'Overdue') &&
-                    (areaId === 'all' || req.requestedRoom.areaId === areaId)
+                // Booked Rooms
+                const requestsQuery = query(roomRequestsCollection, 
+                    where('requestedStartDate', '==', day),
+                    where('status', 'in', ['Ready for Check-in', 'Overdue', 'Closed'])
                 );
-                bookedResources = requestsOnDay.length;
+                 const requestsSnapshot = await getDocs(requestsQuery);
+
+                let relevantRequestCount = 0;
+                for (const requestDoc of requestsSnapshot.docs) {
+                    const requestData = requestDoc.data() as RoomRequest;
+                     if (areaId === 'all' || requestData.requestedRoom.areaId === areaId) {
+                        relevantRequestCount++;
+                    }
+                }
+                bookedResources = relevantRequestCount;
             }
             
             dailyAvailabilities.push({
@@ -70,7 +138,7 @@ export class CalendarService {
             });
         }
 
-        return JSON.parse(JSON.stringify(dailyAvailabilities));
+        return dailyAvailabilities;
     }
 
     static async getDailyDetailedStatus(
@@ -80,45 +148,83 @@ export class CalendarService {
     ): Promise<ItemDailyStatus[]> {
 
         if (resourceType === 'equipment') {
-            const requestsOnDay = equipmentRequests.filter(req =>
-                date >= req.requestedStartDate && date <= req.requestedEndDate &&
-                (req.status === 'Ready for Pickup')
+            const requestsOnDayQuery = query(equipmentRequestsCollection,
+                where('requestedStartDate', '<=', date),
+                where('requestedEndDate', '>=', date),
+                where('status', 'in', ['Ready for Pickup', 'Closed'])
             );
-            const itemsInArea = inventoryItems.filter(item => areaId === 'all' || item.areaId === areaId);
-            return itemsInArea.map(item => {
-                const totalInstances = inventoryInstances.filter(inst => inst.itemId === item.id && inst.condition !== 'Lost/Unusable').length;
-                // FIX: Use 'requestedItems' instead of 'requestedItem'.
-                const bookedInstances = requestsOnDay.filter(r => r.requestedItems.some(ri => ri.itemId === item.id)).length;
-                return {
-                    id: item.id,
-                    name: item.name,
-                    areaId: item.areaId,
-                    totalInstances,
-                    bookedInstances,
-                    isFullyBooked: bookedInstances >= totalInstances,
-                };
-            }).filter(item => item.totalInstances > 0);
+            const requestsOnDaySnapshot = await getDocs(requestsOnDayQuery);
+            const requestsOnDay = requestsOnDaySnapshot.docs.map(doc => doc.data() as EquipmentRequest);
+
+            const itemsQuery = areaId === 'all' ? query(inventoryItemsCollection) : query(inventoryItemsCollection, where('areaId', '==', areaId));
+            const itemsSnapshot = await getDocs(itemsQuery);
+
+            const dailyStatus: ItemDailyStatus[] = [];
+
+            for (const itemDoc of itemsSnapshot.docs) {
+                const item = { id: itemDoc.id, ...itemDoc.data() } as InventoryItem;
+                const instancesQuery = query(inventoryInstancesCollection, where('itemId', '==', item.id), where('condition', '!=', 'Lost/Unusable'));
+                const instancesSnapshot = await getDocs(instancesQuery);
+                const totalInstances = instancesSnapshot.size;
+
+                let bookedInstances = 0;
+                 for (const req of requestsOnDay) {
+                    if (req.requestedItems.some((ri) => ri.itemId === item.id)) {
+                        bookedInstances++;
+                    }
+                }
+
+                if (totalInstances > 0) {
+                    dailyStatus.push({
+                        id: item.id,
+                        name: item.name,
+                        areaId: item.areaId,
+                        totalInstances,
+                        bookedInstances,
+                        isFullyBooked: bookedInstances >= totalInstances,
+                    });
+                }
+            }
+            return dailyStatus;
 
         } else { // rooms
-             const requestsOnDay = roomRequests.filter(req =>
-                req.requestedStartDate === date &&
-                (req.status === 'Ready for Check-in' || req.status === 'Overdue')
+            const requestsOnDayQuery = query(roomRequestsCollection,
+                where('requestedStartDate', '==', date),
+                where('status', 'in', ['Ready for Check-in', 'Overdue', 'Closed'])
             );
-            const typesInArea = roomTypes.filter(rt => areaId === 'all' || rt.areaId === areaId);
-            return typesInArea.map(type => {
-                const allInstances = roomInstances.filter(inst => inst.roomTypeId === type.id);
-                const totalInstances = allInstances.length;
-                const bookedInstances = requestsOnDay.filter(r => r.requestedRoom.roomTypeId === type.id).length;
-                
-                return {
-                    id: type.id,
-                    name: type.name,
-                    areaId: type.areaId,
-                    totalInstances,
-                    bookedInstances,
-                    isFullyBooked: bookedInstances >= totalInstances
-                };
-            }).filter(item => item.totalInstances > 0);
+            const requestsOnDaySnapshot = await getDocs(requestsOnDayQuery);
+            const requestsOnDay = requestsOnDaySnapshot.docs.map(doc => doc.data() as RoomRequest);
+            
+            const typesQuery = areaId === 'all' ? query(roomTypesCollection) : query(roomTypesCollection, where('areaId', '==', areaId));
+            const typesSnapshot = await getDocs(typesQuery);
+
+            const dailyStatus: ItemDailyStatus[] = [];
+
+            for (const typeDoc of typesSnapshot.docs) {
+                const type = { id: typeDoc.id, ...typeDoc.data() } as RoomType;
+                const instancesQuery = query(roomInstancesCollection, where('roomTypeId', '==', type.id));
+                const instancesSnapshot = await getDocs(instancesQuery);
+                const totalInstances = instancesSnapshot.size;
+
+                let bookedInstances = 0;
+                for (const req of requestsOnDay) {
+                    if (req.requestedRoom.roomTypeId === type.id) {
+                        bookedInstances++;
+                    }
+                }
+
+                 if (totalInstances > 0) {
+                    dailyStatus.push({
+                        id: type.id,
+                        name: type.name,
+                        areaId: type.areaId,
+                        totalInstances,
+                        bookedInstances,
+                        isFullyBooked: bookedInstances >= totalInstances
+                    });
+                }
+            }
+             return dailyStatus;
         }
     }
 }

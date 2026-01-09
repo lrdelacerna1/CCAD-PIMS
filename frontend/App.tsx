@@ -5,7 +5,6 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 import Header from './components/layout/Header';
-import { EmailVerificationBanner } from './components/auth/EmailVerificationBanner';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -19,25 +18,32 @@ import MyReservationsPage from './pages/MyReservationsPage';
 import CatalogPage from './pages/CatalogPage';
 import SettingsPage from './pages/SettingsPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <Router>
+    <Router>
+      <AuthProvider>
+        <NotificationProvider>
           <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
             <Header />
-            <EmailVerificationBanner />
             <main>
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+                {/* Verification Route */}
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+
                 {/* Protected Routes */}
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <HomePage />
+                  </ProtectedRoute>
+                }/>
                 <Route path="/profile" element={
                   <ProtectedRoute>
                     <ProfilePage />
@@ -88,9 +94,9 @@ const App: React.FC = () => {
               </Routes>
             </main>
           </div>
-        </Router>
-      </NotificationProvider>
-    </AuthProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </Router>
   );
 };
 

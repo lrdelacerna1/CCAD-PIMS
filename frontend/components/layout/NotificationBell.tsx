@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { BellIcon } from '../Icons';
 import { formatDistanceToNow } from 'date-fns';
 
 const NotificationBell: React.FC = () => {
-    const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+    const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
     const dropdownRef = useRef<HTMLDivElement>(null);

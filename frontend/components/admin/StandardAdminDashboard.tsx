@@ -39,7 +39,7 @@ const StandardAdminDashboard: React.FC = () => {
                 <div className="p-6">
                     <h2 className="text-xl font-semibold dark:text-white">Welcome, Admin!</h2>
                     <p className="text-lg dark:text-gray-300 mt-2">
-                        Hello, <span className="font-semibold">{user?.email}</span>.
+                        Hello, <span className="font-semibold">{user?.emailAddress}</span>.
                     </p>
                     <p className="dark:text-gray-400 mt-2">
                         This dashboard shows the areas you are assigned to manage.

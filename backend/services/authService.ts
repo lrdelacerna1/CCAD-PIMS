@@ -1,189 +1,190 @@
-import { User } from '../../frontend/types';
-import { users, passwords, passwordResetTokens, saveUsersAndPasswords } from '../db/mockDb';
+import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut as firebaseSignOut,
+    User as FirebaseUser,
+    signInWithPopup,
+    GoogleAuthProvider,
+    sendEmailVerification,
+    sendPasswordResetEmail,
+    verifyPasswordResetCode,
+    confirmPasswordReset,
+} from "firebase/auth";
+import { doc, setDoc, getDoc, getDocs, updateDoc, collection, Timestamp } from "firebase/firestore";
+import { db, app } from "../../lib/firebase";
+import { User } from "../../frontend/types";
 
-const uuidv4 = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-}
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+const usersCollection = collection(db, "users");
 
 export class AuthService {
-  static async authenticate(email: string, pass: string): Promise<User> {
-    const user = users.find(u => u.email === email);
-    if (!user || passwords.get(email) !== pass) {
-      throw new Error('Invalid email or password');
-    }
-    localStorage.setItem('user', JSON.stringify(user));
-    return { ...user };
-  }
 
-  /**
-   * Simulates Google Authentication with a specific account selection
-   */
-  static async authenticateWithGoogle(selectedEmail?: string): Promise<User> {
-    // In a real app, this would be the result of a successful OAuth callback
-    const googleUserEmail = selectedEmail || "google-user@example.com";
-    let user = users.find(u => u.email === googleUserEmail);
+    private static async _getUserProfile(uid: string): Promise<User | null> {
+        const userDocRef = doc(db, "users", uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
 
-    if (!user) {
-      // Create a new user if they don't exist (Simulation of first-time Google Sign-in)
-      const nameParts = googleUserEmail.split('@')[0].split('.');
-      const firstName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
-      const lastName = nameParts[1] ? nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1) : "GoogleUser";
+            const convertTimestampToString = (timestamp: any): string => {
+                if (!timestamp) return new Date().toISOString();
+                if (timestamp.toDate) { // Firestore Timestamp
+                    return timestamp.toDate().toISOString();
+                }
+                // Fallback for strings or other date formats
+                return new Date(timestamp).toISOString(); 
+            };
 
-      user = {
-        id: uuidv4(),
-        email: googleUserEmail,
-        firstName: firstName,
-        lastName: lastName,
-        isVerified: true, // Google accounts are pre-verified
-        role: googleUserEmail.includes('admin') ? 'admin' : 'user',
-        contactNumber: ''
-      };
-      users.push(user);
-      passwords.set(googleUserEmail, 'google-oauth-managed');
-      saveUsersAndPasswords();
+            const convertTimestampToStringOptional = (timestamp: any): string | undefined => {
+                if (!timestamp) return undefined;
+                return convertTimestampToString(timestamp);
+            };
+
+            return {
+                id: userDoc.id,
+                ...userData,
+                createdAt: convertTimestampToString(userData.createdAt),
+                lastLogin: convertTimestampToStringOptional(userData.lastLogin),
+            } as User;
+        }
+        return null;
     }
 
-    localStorage.setItem('user', JSON.stringify(user));
-    return { ...user };
-  }
-
-  static async register(userData: {
-    email: string;
-    pass: string;
-    firstName: string;
-    lastName: string;
-    contactNumber?: string;
-  }): Promise<User> {
-    if (users.some(u => u.email === userData.email)) {
-      throw new Error('User with this email already exists');
+    static async authenticate(email: string, pass: string): Promise<User> {
+        const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, pass);
+        await updateDoc(doc(db, "users", firebaseUser.uid), { lastLogin: Timestamp.now() });
+        const user = await this._getUserProfile(firebaseUser.uid);
+        if (!user) throw new Error("User profile not found after authentication.");
+        return user;
     }
-    const newUser: User = {
-      id: uuidv4(),
-      email: userData.email,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      contactNumber: userData.contactNumber || '',
-      isVerified: false,
-      role: 'user',
-    };
-    users.push(newUser);
-    passwords.set(userData.email, userData.pass);
-    saveUsersAndPasswords(); // Persist changes
-    localStorage.setItem('user', JSON.stringify(newUser));
-    return { ...newUser };
-  }
 
-  static async logout(): Promise<void> {
-    localStorage.removeItem('user');
-  }
+    static async signInWithGoogle(): Promise<User> {
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userRef);
 
-  static async verifyCurrentUserEmail(): Promise<User> {
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) {
-          throw new Error('No user is currently logged in.');
-      }
-      
-      const loggedInUser: User = JSON.parse(storedUser);
-      const userInDb = users.find(u => u.id === loggedInUser.id);
-      
-      if (!userInDb) {
-          throw new Error('User not found.');
-      }
+        if (!userDoc.exists()) {
+            const [firstName, ...lastNameParts] = firebaseUser.displayName?.split(' ') || ['', ''];
+            const lastName = lastNameParts.join(' ');
 
-      userInDb.isVerified = true;
-      saveUsersAndPasswords(); // Persist changes
-      localStorage.setItem('user', JSON.stringify(userInDb));
-      return { ...userInDb };
-  }
-  
-  static async getAllUsers(): Promise<User[]> {
-      return JSON.parse(JSON.stringify(users));
-  }
+            const newUser: Omit<User, 'id' | 'createdAt' | 'lastLogin'> = {
+                role: "guest",
+                firstName: firstName,
+                lastName: lastName,
+                emailAddress: firebaseUser.email || "",
+                emailVerified: firebaseUser.emailVerified,
+                contactNumber: firebaseUser.phoneNumber || "",
+            };
+            
+            await setDoc(userRef, {
+                ...newUser,
+                createdAt: Timestamp.now(),
+                lastLogin: Timestamp.now(),
+            });
 
-  static async updateUserManagedAreas(userId: string, areaIds: string[]): Promise<User> {
-      const userIndex = users.findIndex(u => u.id === userId);
-      if (userIndex === -1) {
-          throw new Error('User not found');
-      }
-      users[userIndex].managedAreaIds = areaIds;
-      
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-          const loggedInUser: User = JSON.parse(storedUser);
-          if (loggedInUser.id === userId) {
-              localStorage.setItem('user', JSON.stringify(users[userIndex]));
-          }
-      }
-      saveUsersAndPasswords(); // Persist changes
-      return { ...users[userIndex] };
-  }
+            const user = await this._getUserProfile(firebaseUser.uid);
+            if (!user) throw new Error("Failed to create and fetch new Google user profile.");
+            return user;
 
-  static async updateUserProfile(userId: string, updates: {
-    firstName: string;
-    lastName: string;
-    contactNumber: string;
-  }): Promise<User> {
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex === -1) {
-      throw new Error('User not found');
+        } else {
+            await updateDoc(userRef, { lastLogin: Timestamp.now() });
+            const user = await this._getUserProfile(firebaseUser.uid);
+            if (!user) throw new Error("User profile not found after Google sign-in.");
+            return user;
+        }
+    }
+
+    static async register(userData: Omit<User, 'id' | 'createdAt' | 'lastLogin' | 'emailVerified'> & { password?: string }): Promise<User> {
+        const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, userData.emailAddress, userData.password || '');
+        
+        const newUser: Omit<User, 'id' | 'createdAt' | 'lastLogin'> = {
+            ...userData,
+            emailVerified: firebaseUser.emailVerified,
+        };
+        
+        await setDoc(doc(db, "users", firebaseUser.uid), {
+            ...newUser,
+            createdAt: Timestamp.now(),
+            lastLogin: Timestamp.now(),
+        });
+
+        const user = await this._getUserProfile(firebaseUser.uid);
+        if (!user) throw new Error("Failed to create and fetch new user profile after registration.");
+        return user;
+    }
+
+    static async logout(): Promise<void> {
+        await firebaseSignOut(auth);
+    }
+
+    static async sendVerificationEmail(): Promise<void> {
+        const user = auth.currentUser;
+        if (user) {
+            await sendEmailVerification(user);
+        } else {
+            throw new Error("No user is currently signed in.");
+        }
     }
     
-    users[userIndex] = {
-      ...users[userIndex],
-      firstName: updates.firstName,
-      lastName: updates.lastName,
-      contactNumber: updates.contactNumber,
-    };
+    static async getAllUsers(): Promise<User[]> {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            throw new Error("Authentication required to fetch users.");
+        }
 
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const loggedInUser: User = JSON.parse(storedUser);
-      if (loggedInUser.id === userId) {
-        localStorage.setItem('user', JSON.stringify(users[userIndex]));
-      }
-    }
-    saveUsersAndPasswords(); // Persist changes
-    return { ...users[userIndex] };
-  }
+        const requesterProfile = await this._getUserProfile(currentUser.uid);
+        if (!requesterProfile || (requesterProfile.role !== 'admin' && requesterProfile.role !== 'superadmin')) {
+            throw new Error("Unauthorized: You do not have permission to view all users.");
+        }
 
-  static async requestPasswordReset(email: string): Promise<void> {
-    const user = users.find(u => u.email === email);
-    if (user) {
-        const token = uuidv4();
-        const expires = Date.now() + 3600000; // 1 hour from now
-        passwordResetTokens.set(token, { userId: user.id, expires });
+        const snapshot = await getDocs(usersCollection);
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            const convertTimestampToString = (timestamp: any): string => {
+                if (!timestamp) return new Date().toISOString();
+                if (timestamp.toDate) {
+                    return timestamp.toDate().toISOString();
+                }
+                return new Date(timestamp).toISOString();
+            };
+            const convertTimestampToStringOptional = (timestamp: any): string | undefined => {
+                if (!timestamp) return undefined;
+                return convertTimestampToString(timestamp);
+            };
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: convertTimestampToString(data.createdAt),
+                lastLogin: convertTimestampToStringOptional(data.lastLogin),
+            } as User;
+        });
+    }
 
-        // In a real app, you'd email this link. We'll log it for the mock.
-        console.log(`Password reset link: /#/reset-password?token=${token}`);
+    static async updateUser(userId: string, updates: Partial<User>): Promise<User> {
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, updates);
+        const user = await this._getUserProfile(userId);
+        if (!user) throw new Error("Failed to fetch updated user.");
+        return user;
     }
-    // We don't throw an error for non-existent users to prevent email enumeration.
-  }
 
-  static async validateResetToken(token: string): Promise<string> {
-    const tokenData = passwordResetTokens.get(token);
-    if (!tokenData) {
-        throw new Error('Invalid or expired password reset token.');
+    static async requestPasswordReset(email: string): Promise<void> {
+        await sendPasswordResetEmail(auth, email);
     }
-    if (tokenData.expires < Date.now()) {
-        passwordResetTokens.delete(token); // Clean up expired token
-        throw new Error('Invalid or expired password reset token.');
-    }
-    return tokenData.userId;
-  }
 
-  static async resetPassword(token: string, newPass: string): Promise<User> {
-    const userId = await this.validateResetToken(token);
-    const user = users.find(u => u.id === userId);
-    if (!user) {
-        // This should not happen if token is valid, but good to check.
-        throw new Error('User not found.');
+    static async validateResetToken(token: string): Promise<boolean> {
+        try {
+            await verifyPasswordResetCode(auth, token);
+            return true;
+        } catch (error) {
+            console.error("Invalid reset token:", error);
+            return false;
+        }
     }
-    passwords.set(user.email, newPass);
-    passwordResetTokens.delete(token); // Invalidate token after use
-    saveUsersAndPasswords(); // Persist changes
-    return { ...user };
-  }
+
+    static async resetPassword(token: string, newPass: string): Promise<void> {
+        await confirmPasswordReset(auth, token, newPass);
+    }
 }

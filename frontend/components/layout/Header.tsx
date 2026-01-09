@@ -6,7 +6,7 @@ import NotificationBell from './NotificationBell';
 import AboutModal from './AboutModal';
 
 const Header: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, isSuperAdmin, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -56,7 +56,7 @@ const Header: React.FC = () => {
 
   const handleLogoutClick = () => {
       setIsAccountDropdownOpen(false);
-      logout();
+      signOut();
   };
 
   return (
@@ -87,7 +87,7 @@ const Header: React.FC = () => {
                  </NavLink>
 
                 {/* User Links */}
-                {user.role === 'user' && (
+                {user.role === 'student' && (
                   <>
                     <NavLink 
                         to="/catalog" 
@@ -107,7 +107,7 @@ const Header: React.FC = () => {
                 )}
                 
                 {/* Admin Dropdown */}
-                {(user.role === 'admin' || user.role === 'superadmin') && (
+                {(isSuperAdmin || isAdmin) && (
                   <div className="relative h-full flex items-center" ref={adminDropdownRef}>
                         <button 
                             onClick={() => setIsAdminDropdownOpen(!isAdminDropdownOpen)}
@@ -148,7 +148,7 @@ const Header: React.FC = () => {
                         <div className={`${dropdownContainerClass} right-0 left-auto`}>
                             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
                                 <p className="text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider">Signed in as</p>
-                                <p className="text-sm font-bold text-ccad-black truncate max-w-[200px]">{user.email}</p>
+                                <p className="text-sm font-bold text-ccad-black truncate max-w-[200px]">{user.emailAddress}</p>
                             </div>
                             
                             <button onClick={handleProfileClick} className={dropdownItemClass}>
@@ -200,7 +200,7 @@ const Header: React.FC = () => {
               <>
                  <NavLink to="/" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Home</NavLink>
                 {/* User-specific links */}
-                {user.role === 'user' && (
+                {user.role === 'student' && (
                   <>
                     <NavLink to="/catalog" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Catalog</NavLink>
                     <NavLink to="/my-reservations" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>My Reservations</NavLink>
@@ -208,7 +208,7 @@ const Header: React.FC = () => {
                 )}
 
                 {/* Admin-specific links */}
-                {(user.role === 'admin' || user.role === 'superadmin') && (
+                {(isAdmin || isSuperAdmin) && (
                   <>
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Management</div>
                     <NavLink to="/all-requests" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Requests</NavLink>
@@ -224,7 +224,7 @@ const Header: React.FC = () => {
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Account</div>
                     <NavLink to="/profile" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Settings</NavLink>
                     <button onClick={handleAboutClick} className={`w-full text-left ${mobileLinkClass}`}>Guide</button>
-                    <button onClick={() => { setIsMenuOpen(false); logout(); }} className={`w-full text-left ${mobileLinkClass} text-ccad-red`}>Logout</button>
+                    <button onClick={() => { setIsMenuOpen(false); signOut(); }} className={`w-full text-left ${mobileLinkClass} text-ccad-red`}>Logout</button>
                 </div>
               </>
             ) : (

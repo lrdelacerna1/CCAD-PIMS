@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import EquipmentCatalog from '../components/catalog/EquipmentCatalog';
 import RoomCatalog from '../components/catalog/RoomCatalog';
 import NewEquipmentRequestModal from '../components/requests/NewEquipmentRequestModal';
 import NewRoomRequestModal from '../components/requests/NewRoomRequestModal';
 import ItemDetailsModal from '../components/catalog/ItemDetailsModal';
-// FIX: Import ReservationSettings type.
 import { Area, InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance, ReservationSettings } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { Cart } from '../components/catalog/Cart';
@@ -14,9 +13,7 @@ import { ShoppingCartIcon } from '../components/Icons';
 import InstanceSelectionModal from '../components/catalog/InstanceSelectionModal';
 import { getInventoryCatalogApi } from '../../backend/api/inventory';
 import { getRoomCatalogApi } from '../../backend/api/rooms';
-// FIX: Import getSettingsApi to fetch system settings.
 import { getSettingsApi } from '../../backend/api/settings';
-
 
 const CatalogPage: React.FC = () => {
     const location = useLocation();
@@ -24,13 +21,10 @@ const CatalogPage: React.FC = () => {
         (location.state as { activeTab?: 'equipment' | 'rooms' })?.activeTab || 'equipment'
     );
     const [areas, setAreas] = useState<Area[]>([]);
-    
-    // State for catalog data, now managed by this parent component
     const [equipmentInventory, setEquipmentInventory] = useState<InventoryItemForCatalog[]>([]);
     const [roomInventory, setRoomInventory] = useState<RoomTypeForCatalog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    // FIX: Add state for system settings.
     const [settings, setSettings] = useState<ReservationSettings | null>(null);
 
     const today = new Date().toISOString().split('T')[0];
@@ -50,46 +44,58 @@ const CatalogPage: React.FC = () => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setError('');
-        try {
-            // FIX: Fetch settings along with areas data.
-            const [areasData, settingsData] = await Promise.all([
-                getAreasApi(),
-                getSettingsApi(),
-            ]);
-            setAreas(areasData);
-            setSettings(settingsData);
-            
-            // Fetch catalog data based on active tab
-            if (activeTab === 'equipment') {
-                const inventoryData = await getInventoryCatalogApi(startDate, endDate);
-                setEquipmentInventory(inventoryData);
-            } else {
-                const roomData = await getRoomCatalogApi(startDate, endDate);
-                setRoomInventory(roomData);
-            }
-        } catch (err) {
-            setError('Failed to load catalog data.');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [startDate, endDate, activeTab]);
-
+    // Effect for fetching static data like areas and settings once
     useEffect(() => {
-        const handler = setTimeout(() => {
-            if (new Date(endDate) >= new Date(startDate)) {
-                fetchData();
-            } else {
+        const fetchStaticData = async () => {
+            try {
+                const [areasData, settingsData] = await Promise.all([
+                    getAreasApi(),
+                    getSettingsApi(),
+                ]);
+                setAreas(areasData);
+                setSettings(settingsData);
+            } catch (err) {
+                setError('Failed to load page essentials.'); // More specific error
+            }
+        };
+        fetchStaticData();
+    }, []); // Runs once on mount
+
+    // Effect for fetching catalog data when dates or tab change
+    useEffect(() => {
+        const fetchCatalogData = async () => {
+            if (new Date(endDate) < new Date(startDate)) {
                 setEquipmentInventory([]);
                 setRoomInventory([]);
                 setError("End date cannot be before start date.");
+                return;
             }
+            
+            setIsLoading(true);
+            setError('');
+            try {
+                if (activeTab === 'equipment') {
+                    const inventoryData = await getInventoryCatalogApi(startDate, endDate);
+                    setEquipmentInventory(inventoryData);
+                } else {
+                    const roomData = await getRoomCatalogApi(startDate, endDate);
+                    setRoomInventory(roomData);
+                }
+            } catch (err) {
+                setError('Failed to load catalog data.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        // Debounce the fetch to avoid excessive calls
+        const handler = setTimeout(() => {
+            fetchCatalogData();
         }, 300);
+
         return () => clearTimeout(handler);
-    }, [fetchData, startDate, endDate]);
-    
+    }, [startDate, endDate, activeTab]); // Re-fetches only when these change
+
     useEffect(() => {
         setEquipmentCart(new Map());
         setRoomCart(null);
@@ -97,7 +103,6 @@ const CatalogPage: React.FC = () => {
 
     const totalItemCount = useMemo(() => {
         if (activeTab === 'equipment') {
-            // FIX: Explicitly cast equipmentCart values to resolve 'unknown' property access errors.
             return (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]).reduce((sum: number, group) => sum + group.instances.size, 0);
         }
         return roomCart ? 1 : 0;
@@ -109,7 +114,6 @@ const CatalogPage: React.FC = () => {
         if ('serialNumber' in instances[0]) { // Equipment
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
-                // FIX: Explicitly cast the retrieved group from equipmentCart to avoid 'unknown' type error when accessing 'instances' property.
                 const group = (newCart.get(item.id) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined) || { item: item as InventoryItemForCatalog, instances: new Map() };
                 (instances as InventoryInstance[]).forEach(inst => {
                     group.instances.set(inst.id, inst);
@@ -127,7 +131,6 @@ const CatalogPage: React.FC = () => {
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
                 if (instanceId) {
-                    // FIX: Explicitly cast the retrieved group to avoid 'unknown' type error when accessing properties.
                     const group = newCart.get(itemId) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined;
                     if (group) {
                         group.instances.delete(instanceId);
@@ -156,7 +159,7 @@ const CatalogPage: React.FC = () => {
         setIsRequestModalOpen(false);
         if (activeTab === 'equipment') setEquipmentCart(new Map());
         else setRoomCart(null);
-        fetchData(); // This is the key change to refresh catalog availability
+        // No need to call fetch, the useEffect will handle it when dates change or tab switches.
     };
 
     const handleViewDetailsClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => setViewingItem(item);
@@ -165,7 +168,6 @@ const CatalogPage: React.FC = () => {
         setViewingItem(null);
         setSelectingInstancesFor(item);
     };
-
 
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
@@ -283,7 +285,6 @@ const CatalogPage: React.FC = () => {
                         areas={areas}
                         onClose={handleCloseRequestModal}
                         onSuccess={handleSuccessRequest}
-                        // FIX: Explicitly cast equipmentCart entries to resolve 'unknown' property access errors.
                         items={new Map((Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]).flatMap(group => 
                             Array.from(group.instances.values()).map(inst => [inst.id, { item: group.item, instance: inst }])
                         ))}

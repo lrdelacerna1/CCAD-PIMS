@@ -159,7 +159,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
             return;
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
-        if (user.role === 'user') {
+        if (user.role === 'student') {
             if (!endorserName.trim()) { setError("Endorser's name is required."); return; }
             if (!endorserPosition.trim()) { setError("Endorser's position is required."); return; }
             if (!endorserEmail.trim()) { setError("Endorser's email is required."); return; }
@@ -180,17 +180,16 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
             await createEquipmentRequestApi({
                 userId: user.id,
                 userName: `${user.firstName} ${user.lastName}`,
-                userContact: user.email,
+                userContact: user.emailAddress,
                 purpose,
-                endorserName: user.role === 'user' ? endorserName : undefined,
-                endorserPosition: user.role === 'user' ? endorserPosition : undefined,
-                endorserEmail: user.role === 'user' ? endorserEmail : undefined,
+                endorserName: user.role === 'student' ? endorserName : undefined,
+                endorserPosition: user.role === 'student' ? endorserPosition : undefined,
+                endorserEmail: user.role === 'student' ? endorserEmail : undefined,
                 requestedStartDate: currentStartDate,
                 requestedEndDate: currentEndDate,
                 secondaryContactName,
                 secondaryContactNumber,
                 requestedItems: requestedItemsPayload,
-                isFlaggedNoShow: false,
             });
             onSuccess();
         } catch (err: any) {
@@ -309,7 +308,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
 
                         <div className="space-y-4">
                             <Textarea label="Purpose" id="purpose" value={purpose} onChange={e => setPurpose(e.target.value)} required />
-                            {user?.role === 'user' && (
+                            {user?.role === 'student' && (
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
                                     <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
                                     <Input 

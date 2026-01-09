@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { User, Area } from '../../types';
-import { updateUserManagedAreasApi } from '../../../backend/api/auth';
+import { updateUserApi } from '../../../backend/api/auth';
 import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
 import { Input } from '../ui/Input';
@@ -36,7 +36,7 @@ const AdminAssignment: React.FC<AdminAssignmentProps> = ({ admins, areas, refres
         setIsLoading(true);
         setError('');
         try {
-            await updateUserManagedAreasApi(adminId, selectedAreaIds);
+            await updateUserApi(adminId, { managedAreaIds: selectedAreaIds });
             refreshData(); // Refresh all data from parent
             handleCancel();
         } catch (err) {
@@ -65,7 +65,7 @@ const AdminAssignment: React.FC<AdminAssignmentProps> = ({ admins, areas, refres
         return admins.filter(admin =>
             admin.firstName.toLowerCase().includes(lowercasedQuery) ||
             admin.lastName.toLowerCase().includes(lowercasedQuery) ||
-            admin.email.toLowerCase().includes(lowercasedQuery)
+            admin.emailAddress.toLowerCase().includes(lowercasedQuery)
         );
     }, [admins, searchQuery]);
 
@@ -92,7 +92,7 @@ const AdminAssignment: React.FC<AdminAssignmentProps> = ({ admins, areas, refres
                                     onClick={() => { if (editingAdminId !== admin.id) setViewingAdmin(admin) }}
                                 >
                                     <p className="font-semibold text-slate-900 dark:text-white">{admin.firstName} {admin.lastName}</p>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{admin.email}</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">{admin.emailAddress}</p>
                                 </div>
                                 {editingAdminId !== admin.id && (
                                     <div onClick={e => e.stopPropagation()}>

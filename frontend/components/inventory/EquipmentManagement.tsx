@@ -737,11 +737,19 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
         const [isLoading, setIsLoading] = useState(true);
         useEffect(() => {
             const fetchInstances = async () => {
+                if (!item.id) {
+                    setIsLoading(false);
+                    return;
+                }
                 setIsLoading(true);
                 try {
                     const data = await getInstancesByItemIdApi(item.id);
                     setInstances(data);
-                } catch (error) { console.error("Failed to fetch instances for item:", item.name); } finally { setIsLoading(false); }
+                } catch (error) { 
+                    console.error(`Failed to fetch instances for item: '${item.name}'`, error); 
+                } finally { 
+                    setIsLoading(false); 
+                }
             };
             fetchInstances();
         }, [item.id, item.quantity.total]);

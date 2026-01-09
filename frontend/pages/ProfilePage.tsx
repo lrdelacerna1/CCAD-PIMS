@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { UserIcon, PhoneIcon, MailIcon, BuildingOfficeIcon, CheckCircleIcon, ExclamationTriangleIcon } from '../components/Icons';
+import { UserIcon, PhoneIcon, MailIcon, BuildingOfficeIcon, CheckCircleIcon, ExclamationTriangleIcon, IdentificationIcon } from '../components/Icons';
 import { getAreasApi } from '../../backend/api/areas';
 import { Area } from '../types';
 
@@ -13,6 +13,7 @@ const ProfilePage: React.FC = () => {
     firstName: '',
     lastName: '',
     contactNumber: '',
+    idNumber: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,9 +25,10 @@ const ProfilePage: React.FC = () => {
         firstName: user.firstName,
         lastName: user.lastName,
         contactNumber: user.contactNumber || '',
+        idNumber: user.idNumber || '',
       });
 
-      if ((user.role === 'admin' || user.role === 'superadmin') && user.managedAreaIds?.length) {
+      if ((user.role === 'admin') && user.managedAreaIds?.length) {
           getAreasApi().then((allAreas: Area[]) => {
               const names = user.managedAreaIds
                   ?.map(id => allAreas.find(a => a.id === id)?.name)
@@ -55,6 +57,7 @@ const ProfilePage: React.FC = () => {
         firstName: user.firstName,
         lastName: user.lastName,
         contactNumber: user.contactNumber || '',
+        idNumber: user.idNumber || '',
       });
     }
     setError('');
@@ -83,7 +86,7 @@ const ProfilePage: React.FC = () => {
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300 capitalize border border-sky-200 dark:border-sky-800">
                         {user.role}
                     </span>
-                    {user.isVerified ? (
+                    {user.emailVerified ? (
                         <span className="flex items-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                             <CheckCircleIcon className="w-4 h-4 mr-1" /> Verified Account
                         </span>
@@ -127,9 +130,8 @@ const ProfilePage: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <Input label="First Name" id="firstName" name="firstName" value={formData.firstName} onChange={handleInputChange} />
                                 <Input label="Last Name" id="lastName" name="lastName" value={formData.lastName} onChange={handleInputChange} />
-                                <div className="md:col-span-2">
-                                    <Input label="Contact Number" id="contactNumber" name="contactNumber" value={formData.contactNumber} onChange={handleInputChange} icon={<PhoneIcon className="w-5 h-5"/>} />
-                                </div>
+                                <Input label="ID Number" id="idNumber" name="idNumber" value={formData.idNumber} onChange={handleInputChange} icon={<IdentificationIcon className="w-5 h-5"/>} />
+                                <Input label="Contact Number" id="contactNumber" name="contactNumber" value={formData.contactNumber} onChange={handleInputChange} icon={<PhoneIcon className="w-5 h-5"/>} />
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
@@ -138,17 +140,24 @@ const ProfilePage: React.FC = () => {
                                     <p className="text-slate-900 dark:text-white font-medium text-lg">{user.firstName} {user.lastName}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Contact Number</p>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">ID Number</p>
                                     <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">
-                                        <PhoneIcon className="w-4 h-4 text-slate-400" />
-                                        {user.contactNumber || 'Not provided'}
+                                        <IdentificationIcon className="w-4 h-4 text-slate-400" />
+                                        {user.idNumber || 'Not provided'}
                                     </div>
                                 </div>
                                 <div className="md:col-span-2">
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Email Address</p>
                                     <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">
                                         <MailIcon className="w-4 h-4 text-slate-400" />
-                                        {user.email}
+                                        {user.emailAddress}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Contact Number</p>
+                                    <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">
+                                        <PhoneIcon className="w-4 h-4 text-slate-400" />
+                                        {user.contactNumber || 'Not provided'}
                                     </div>
                                 </div>
                             </div>
@@ -165,8 +174,8 @@ const ProfilePage: React.FC = () => {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-100 dark:border-slate-600">
                             <span className="text-sm text-slate-600 dark:text-slate-300">Verification</span>
-                            <span className={`flex items-center text-sm font-medium ${user.isVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                                {user.isVerified ? (
+                            <span className={`flex items-center text-sm font-medium ${user.emailVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                {user.emailVerified ? (
                                     <><CheckCircleIcon className="w-4 h-4 mr-1"/> Verified</>
                                 ) : (
                                     <><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> Unverified</>
@@ -181,7 +190,7 @@ const ProfilePage: React.FC = () => {
                     </div>
                     </div>
 
-                    {(user.role === 'admin' || user.role === 'superadmin') && managedAreaNames.length > 0 && (
+                    {(user.role === 'admin') && managedAreaNames.length > 0 && (
                     <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <BuildingOfficeIcon className="w-5 h-5 text-indigo-500" /> Managed Areas

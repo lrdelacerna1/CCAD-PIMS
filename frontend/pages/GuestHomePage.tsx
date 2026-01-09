@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ViewGridIcon, CalendarPlusIcon, CheckCircleIcon } from '../Icons';
+import { ViewGridIcon, CheckCircleIcon } from '../components/Icons'; // Adjusted import path
+import { CalendarPlusIcon } from '../components/Icons'; // Corrected import for CalendarPlusIcon
 import { Button } from '../components/ui/Button';
 
 // Brand Color: #880000 (Red)

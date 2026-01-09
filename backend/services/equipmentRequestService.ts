@@ -1,65 +1,112 @@
-import { EquipmentRequest, EquipmentRequestStatus } from '../../frontend/types';
-import { equipmentRequests, areas, users } from '../db/mockDb';
+
+import {
+    collection,
+    getDocs,
+    getDoc,
+    addDoc,
+    doc,
+    query,
+    where,
+    orderBy,
+    serverTimestamp,
+    writeBatch
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { EquipmentRequest, EquipmentRequestStatus, User } from '../../frontend/types';
 import { NotificationService } from './notificationService';
 import { AirSlateService } from './airSlateService';
-// PenaltyService will be used later for returns
 
-const uuidv4 = () => `eq-req-${Math.random().toString(36).substr(2, 9)}`;
+const equipmentRequestsCollection = collection(db, "equipmentRequests");
+const usersCollection = collection(db, "users");
 
 export class EquipmentRequestService {
     
     static async getAll(): Promise<EquipmentRequest[]> {
-        return JSON.parse(JSON.stringify(equipmentRequests));
+        const q = query(equipmentRequestsCollection, orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as EquipmentRequest;
+        });
     }
 
     static async getByUserId(userId: string): Promise<EquipmentRequest[]> {
-        // HACK: For demo, show default user's requests if the current user has none.
-        const userRequests = equipmentRequests.filter(r => r.userId === userId);
-        if (userRequests.length === 0 && userId !== 'user-4') {
-            return JSON.parse(JSON.stringify(equipmentRequests.filter(r => r.userId === 'user-4')));
-        }
-        return JSON.parse(JSON.stringify(userRequests));
+        const q = query(equipmentRequestsCollection, where("userId", "==", userId), orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as EquipmentRequest;
+        });
     }
 
     static async create(data: Omit<EquipmentRequest, 'id' | 'status' | 'dateFiled'>): Promise<EquipmentRequest> {
-        const requestingUser = users.find(u => u.id === data.userId);
-        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'superadmin');
+        const userRef = doc(db, "users", data.userId);
+        const userSnap = await getDoc(userRef);
+        const requestingUser = userSnap.exists() ? userSnap.data() as User : null;
+        
+        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'areaManager');
 
-        const newRequest: EquipmentRequest = {
-            id: uuidv4(),
-            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
-            dateFiled: new Date().toISOString(),
+        const newRequestData: any = {
             ...data,
+            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
+            dateFiled: serverTimestamp(),
+            isFlaggedNoShow: false, // Default value
         };
 
-        // Only initiate workflow for non-admins who need endorsement
         if (!isAdminRequest) {
-            const airSlateData = AirSlateService.initiateWorkflow(newRequest);
+            const airSlateData = AirSlateService.initiateWorkflow(newRequestData as EquipmentRequest);
             if (airSlateData) {
-                Object.assign(newRequest, airSlateData);
+                Object.assign(newRequestData, airSlateData);
             }
         }
 
-        equipmentRequests.unshift(newRequest);
-        return { ...newRequest };
+        const docRef = await addDoc(equipmentRequestsCollection, newRequestData);
+        
+        // We fetch the document again to get the server-generated timestamp
+        const newDocSnap = await getDoc(docRef);
+        const createdRequest = newDocSnap.data();
+
+        return {
+            id: docRef.id,
+            ...createdRequest,
+            dateFiled: (createdRequest?.dateFiled as any).toDate().toISOString(),
+        } as EquipmentRequest;
     }
 
     static async updateStatus(ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
-        equipmentRequests.forEach(req => {
-            if (ids.includes(req.id)) {
-                req.status = status;
-                if (status === 'Rejected' && rejectionReason) {
-                    req.rejectionReason = rejectionReason;
-                }
+        const batch = writeBatch(db);
 
-                // Create a notification for the user
-                const areaName = areas.find(a => a.id === req.requestedItems[0]?.areaId)?.name || 'an area';
-                NotificationService.createNotification({
+        for (const id of ids) {
+            const reqRef = doc(db, "equipmentRequests", id);
+            const updateData: any = { status };
+            if (status === 'Rejected' && rejectionReason) {
+                updateData.rejectionReason = rejectionReason;
+            }
+            batch.update(reqRef, updateData);
+        }
+        
+        await batch.commit();
+
+        // Create notifications after the batch has been committed
+        for (const id of ids) {
+            const reqDoc = await getDoc(doc(db, "equipmentRequests", id));
+            if (reqDoc.exists()) {
+                const req = reqDoc.data() as EquipmentRequest;
+                 NotificationService.createNotification({
                     userId: req.userId,
-                    message: `Your equipment request for '${req.purpose}' in ${areaName} was ${status.toLowerCase()}.`,
-                    isRead: false, createdAt: new Date().toISOString(), equipmentRequestId: req.id,
+                    message: `Your equipment request for purpose \'${req.purpose}\' was ${status.toLowerCase()}.`,
+                    isRead: false,
+                    equipmentRequestId: id,
                 });
             }
-        });
+        }
     }
 }

@@ -1,64 +1,109 @@
-import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
-import { roomRequests, areas, users } from '../db/mockDb';
+
+import {
+    collection,
+    getDocs,
+    getDoc,
+    addDoc,
+    doc,
+    query,
+    where,
+    orderBy,
+    serverTimestamp,
+    writeBatch
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { RoomRequest, RoomRequestStatus, User } from '../../frontend/types';
 import { NotificationService } from './notificationService';
 import { AirSlateService } from './airSlateService';
 
-const uuidv4 = () => `room-req-${Math.random().toString(36).substr(2, 9)}`;
+const roomRequestsCollection = collection(db, "roomRequests");
+const usersCollection = collection(db, "users");
 
 export class RoomRequestService {
     
     static async getAll(): Promise<RoomRequest[]> {
-        return JSON.parse(JSON.stringify(roomRequests));
+        const q = query(roomRequestsCollection, orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as RoomRequest;
+        });
     }
 
     static async getByUserId(userId: string): Promise<RoomRequest[]> {
-        // HACK: For demo, show default user's requests if the current user has none.
-        const userRequests = roomRequests.filter(r => r.userId === userId);
-        if (userRequests.length === 0 && userId !== 'user-4') {
-            return JSON.parse(JSON.stringify(roomRequests.filter(r => r.userId === 'user-4')));
-        }
-        return JSON.parse(JSON.stringify(userRequests));
+        const q = query(roomRequestsCollection, where("userId", "==", userId), orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as RoomRequest;
+        });
     }
 
     static async create(data: Omit<RoomRequest, 'id' | 'status' | 'dateFiled'>): Promise<RoomRequest> {
-        const requestingUser = users.find(u => u.id === data.userId);
-        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'superadmin');
-
-        const newRequest: RoomRequest = {
-            id: uuidv4(),
-            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
-            dateFiled: new Date().toISOString(),
-            ...data,
-        };
+        const userRef = doc(db, "users", data.userId);
+        const userSnap = await getDoc(userRef);
+        const requestingUser = userSnap.exists() ? userSnap.data() as User : null;
         
-        // Only initiate workflow for non-admins who need endorsement
+        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'areaManager');
+
+        const newRequestData: any = {
+            ...data,
+            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
+            dateFiled: serverTimestamp(),
+        };
+
         if (!isAdminRequest) {
-            const airSlateData = AirSlateService.initiateWorkflow(newRequest);
+            const airSlateData = AirSlateService.initiateWorkflow(newRequestData as RoomRequest);
             if (airSlateData) {
-                Object.assign(newRequest, airSlateData);
+                Object.assign(newRequestData, airSlateData);
             }
         }
 
-        roomRequests.unshift(newRequest);
-        return { ...newRequest };
+        const docRef = await addDoc(roomRequestsCollection, newRequestData);
+        
+        const newDocSnap = await getDoc(docRef);
+        const createdRequest = newDocSnap.data();
+
+        return {
+            id: docRef.id,
+            ...createdRequest,
+            dateFiled: (createdRequest?.dateFiled as any).toDate().toISOString(),
+        } as RoomRequest;
     }
 
     static async updateStatus(ids: string[], status: RoomRequestStatus, rejectionReason?: string): Promise<void> {
-        roomRequests.forEach(req => {
-            if (ids.includes(req.id)) {
-                req.status = status;
-                if (status === 'Rejected' && rejectionReason) {
-                    req.rejectionReason = rejectionReason;
-                }
+        const batch = writeBatch(db);
 
-                // Create a notification for the user
-                const areaName = areas.find(a => a.id === req.requestedRoom.areaId)?.name || 'an area';
+        for (const id of ids) {
+            const reqRef = doc(db, "roomRequests", id);
+            const updateData: any = { status };
+            if (status === 'Rejected' && rejectionReason) {
+                updateData.rejectionReason = rejectionReason;
+            }
+            batch.update(reqRef, updateData);
+        }
+        
+        await batch.commit();
+
+        for (const id of ids) {
+            const reqDoc = await getDoc(doc(db, "roomRequests", id));
+            if (reqDoc.exists()) {
+                const req = reqDoc.data() as RoomRequest;
                 NotificationService.createNotification({
                     userId: req.userId,
-                    message: `Your room request for '${req.purpose}' in ${areaName} was ${status.toLowerCase()}.`,
-                    isRead: false, createdAt: new Date().toISOString(), roomRequestId: req.id,
+                    message: `Your room request for purpose \'${req.purpose}\' was ${status.toLowerCase()}.`,
+                    isRead: false,
+                    roomRequestId: id,
                 });
             }
-        });
+        }
     }
 }

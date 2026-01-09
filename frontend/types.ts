@@ -1,12 +1,18 @@
+export type UserRole = 'guest' | 'faculty' | 'student' | 'user' | 'admin' | 'superadmin';
+
 export interface User {
   id: string;
-  email: string;
-  isVerified: boolean;
-  role: 'user' | 'admin' | 'superadmin';
+  emailAddress: string;
+  emailVerified: boolean;
+  role: UserRole;
   firstName: string;
   lastName: string;
   contactNumber?: string;
+  idNumber?: string;
+  program?: string;
   managedAreaIds?: string[];
+  createdAt: string;
+  lastLogin?: string;
 }
 
 export interface Area {

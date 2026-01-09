@@ -1,44 +1,73 @@
-import { Notification } from '../../frontend/types';
-import { notifications } from '../db/mockDb';
+
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    doc, 
+    getDoc, // Correctly import getDoc
+    updateDoc, 
+    addDoc, 
+    serverTimestamp, 
+    writeBatch, 
+    orderBy
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { Notification } from "../../frontend/types";
+
+const notificationsCollection = collection(db, "notifications");
 
 export class NotificationService {
     static async getNotificationsByUserId(userId: string): Promise<Notification[]> {
-        let userNotifications = notifications
-            .filter(n => n.userId === userId)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            
-        // HACK: For demo purposes, if a new user has no notifications, show the default user's notifications.
-        if (userNotifications.length === 0 && userId !== 'user-4') {
-            userNotifications = notifications
-                .filter(n => n.userId === 'user-4') // The default user with sample data
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
+        const q = query(notificationsCollection, where("userId", "==", userId), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        const notifications: Notification[] = [];
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                createdAt: (data.createdAt as any).toDate().toISOString(), // Convert Timestamp to ISO string
+            } as Notification);
+        });
 
-        return JSON.parse(JSON.stringify(userNotifications));
+        return notifications;
     }
 
     static async markNotificationAsRead(notificationId: string): Promise<Notification | null> {
-        const notification = notifications.find(n => n.id === notificationId);
-        if (notification) {
-            notification.isRead = true;
-            return { ...notification };
+        const notificationRef = doc(db, "notifications", notificationId);
+        await updateDoc(notificationRef, { isRead: true });
+        
+        const updatedDoc = await getDoc(notificationRef); // Use getDoc for a single document
+        if (updatedDoc.exists()) {
+             const data = updatedDoc.data();
+             return {
+                id: updatedDoc.id,
+                ...data,
+                createdAt: (data.createdAt as any).toDate().toISOString(),
+            } as Notification;
         }
         return null;
     }
 
-     static async markAllNotificationsAsRead(userId: string): Promise<void> {
-        notifications.forEach(n => {
-            if (n.userId === userId) {
-                n.isRead = true;
-            }
+    static async markAllNotificationsAsRead(userId: string): Promise<void> {
+        const batch = writeBatch(db);
+        const q = query(notificationsCollection, where("userId", "==", userId), where("isRead", "==", false));
+        
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+            batch.update(doc.ref, { isRead: true });
         });
+
+        await batch.commit();
     }
 
-    static createNotification(notification: Omit<Notification, 'id'>) {
-        const newNotification: Notification = {
-            id: `notif-${Date.now()}`,
-            ...notification,
-        };
-        notifications.push(newNotification);
+    static async createNotification(notificationData: Omit<Notification, 'id' | 'createdAt'>): Promise<void> {
+        await addDoc(notificationsCollection, {
+            ...notificationData,
+            createdAt: serverTimestamp(),
+            isRead: false, // Ensure new notifications are unread
+        });
     }
 }

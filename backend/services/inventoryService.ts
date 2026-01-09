@@ -1,86 +1,133 @@
+import {
+    collection,
+    getDocs,
+    getDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    query,
+    where,
+    writeBatch,
+    Query,
+    DocumentData
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import {
+    InventoryItem,
+    InventoryInstance,
+    InventoryItemWithQuantity,
+    AvailabilityRequest,
+    InstanceAvailabilityResult,
+    InventoryItemForCatalog,
+    AvailabilityStatus,
+    InventoryInstanceCondition
+} from '../../frontend/types';
 
-
-import { InventoryItem, InventoryInstance, InventoryItemWithQuantity, AvailabilityRequest, InstanceAvailabilityResult, InventoryItemForCatalog, AvailabilityStatus, InventoryInstanceCondition } from '../../frontend/types';
-// FIX: Import 'equipmentRequests' instead of the non-existent 'reservations'.
-import { inventoryItems, inventoryInstances, equipmentRequests } from '../db/mockDb';
-
-const uuidv4 = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = (Math.random() * 16) | 0,
-            v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
-};
+const inventoryItemsCollection = collection(db, "inventoryItems");
+const inventoryInstancesCollection = collection(db, "inventoryInstances");
+const equipmentRequestsCollection = collection(db, "equipmentRequests");
 
 export class InventoryService {
+
+    private static async _getDocs(q: Query<DocumentData>) {
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
     static async getInventory(): Promise<InventoryItemWithQuantity[]> {
-        const itemsWithQuantities: InventoryItemWithQuantity[] = inventoryItems.map(item => {
-            const nonLostInstances = inventoryInstances.filter(inst => inst.itemId === item.id && inst.condition !== 'Lost/Unusable');
-            
+        const items = await this._getDocs(query(inventoryItemsCollection));
+        const instances = await this._getDocs(query(inventoryInstancesCollection, where('condition', '!=', 'Lost/Unusable')));
+
+        const instancesByItemId = instances.reduce((acc, inst) => {
+            const itemId = (inst as any).itemId;
+            if (!acc[itemId]) {
+                acc[itemId] = [];
+            }
+            acc[itemId].push(inst);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        const itemsWithQuantities: InventoryItemWithQuantity[] = items.map(item => {
+            const nonLostInstances = instancesByItemId[(item as any).id] || [];
             const quantity = {
                 total: nonLostInstances.length,
                 available: nonLostInstances.filter(i => i.status === 'Available').length,
                 reserved: nonLostInstances.filter(i => i.status === 'Reserved').length,
                 underMaintenance: nonLostInstances.filter(i => i.status === 'Under Maintenance').length,
             };
-            return { ...item, quantity };
-        }).filter(item => item.quantity.total > 0 || item.isHidden); // Keep items if they have instances OR if they are hidden/manually managed
+            return { ...item, quantity } as InventoryItemWithQuantity;
+        }).filter(item => (item.quantity.total > 0 || (item as any).isHidden));
 
-        return JSON.parse(JSON.stringify(itemsWithQuantities));
+        return itemsWithQuantities;
     }
 
     static async getInventoryForCatalog(startDate: string, endDate: string): Promise<InventoryItemForCatalog[]> {
-        // Only get visible items for the catalog
-        const baseInventory = (await this.getInventory()).filter(item => !item.isHidden);
-        
+        const baseInventory = (await this.getInventory()).filter(item => !(item as any).isHidden);
+        if (baseInventory.length === 0) return [];
+
+        const itemIds = baseInventory.map(item => (item as any).id);
+
+        // Fetch all usable instances for the relevant items and map them by itemId.
+        const instancesQuery = query(inventoryInstancesCollection, where('itemId', 'in', itemIds), where('condition', '!=', 'Lost/Unusable'));
+        const allInstances = await this._getDocs(instancesQuery);
+        const instancesByItemId = allInstances.reduce((acc, inst) => {
+            const itemId = (inst as any).itemId;
+            if (!acc[itemId]) acc[itemId] = [];
+            acc[itemId].push(inst);
+            return acc;
+        }, {} as Record<string, any[]>);
+
         const datesInRange: string[] = [];
-        let currentDate = new Date(startDate + 'T00:00:00Z');
-        const lastDate = new Date(endDate + 'T00:00:00Z');
-        if (lastDate >= currentDate) {
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        if (startDate && endDate) {
+            let currentDate = new Date(startDate + 'T00:00:00Z');
+            const lastDate = new Date(endDate + 'T00:00:00Z');
+            if (lastDate >= currentDate) {
+                while (currentDate <= lastDate) {
+                    datesInRange.push(currentDate.toISOString().split('T')[0]);
+                    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+                }
             }
         }
+        
+        // Fetch all relevant reservations
+        const reservationsQuery = query(equipmentRequestsCollection,
+            where('status', 'in', ['Submitted', 'Approved', 'Ready for Pickup']),
+            where('requestedEndDate', '>=', startDate || '0'),
+        );
+        const allReservations = (await this._getDocs(reservationsQuery)).filter(res => (res as any).requestedStartDate <= endDate);
+        
+        // Pre-calculate bookings per item. This is the core optimization.
+        const bookingsByItemId = allReservations.reduce((acc, res) => {
+            const req = res as any;
+            (req.requestedItems || []).forEach((reqItem: any) => {
+                if (itemIds.includes(reqItem.itemId)) {
+                    if (!acc[reqItem.itemId]) {
+                        acc[reqItem.itemId] = 0;
+                    }
+                    acc[reqItem.itemId]++;
+                }
+            });
+            return acc;
+        }, {} as Record<string, number>);
 
-        const catalogItems: InventoryItemForCatalog[] = [];
-        for (const item of baseInventory) {
-            const allNonLostInstances = inventoryInstances.filter(inst => inst.itemId === item.id && inst.condition !== 'Lost/Unusable');
+
+        const catalogItems: InventoryItemForCatalog[] = baseInventory.map(item => {
+            const itemId = (item as any).id;
+            const itemInstances = instancesByItemId[itemId] || [];
             
             let availableForDates = 0;
-
             if (datesInRange.length > 0) {
-                // Find instances that are physically available and not blocked on ANY of the requested dates
-                const potentiallyAvailableInstances = allNonLostInstances.filter(inst => 
-                    inst.status === 'Available' && 
-                    !(inst.blockedDates && inst.blockedDates.some(d => datesInRange.includes(d)))
+                const potentiallyAvailableInstances = itemInstances.filter(inst =>
+                    (inst as any).status === 'Available' &&
+                    !((inst as any).blockedDates || []).some((d: string) => datesInRange.includes(d))
                 );
                 
-                // Find out how many are reserved on the peak day within the range
-                let maxConcurrentReservations = 0;
-                for (const date of datesInRange) {
-                    const reservationsOnDate = equipmentRequests.filter(res =>
-                        res.requestedStartDate <= date && res.requestedEndDate >= date &&
-                        ['Pending Confirmation', 'For Approval', 'Ready for Pickup'].includes(res.status)
-                    );
-
-                    const bookedCountOnDate = reservationsOnDate.reduce((count, req) => {
-                        const itemCountInRequest = req.requestedItems.filter(reqItem => reqItem.itemId === item.id).length;
-                        return count + itemCountInRequest;
-                    }, 0);
-
-                    if (bookedCountOnDate > maxConcurrentReservations) {
-                        maxConcurrentReservations = bookedCountOnDate;
-                    }
-                }
-
-                // The number available for the whole duration is the number of unblocked, available instances minus the peak reservation count
-                const guaranteedAvailableCount = potentiallyAvailableInstances.length - maxConcurrentReservations;
-                availableForDates = Math.max(0, guaranteedAvailableCount);
+                const bookedCount = bookingsByItemId[itemId] || 0;
+                availableForDates = Math.max(0, potentiallyAvailableInstances.length - bookedCount);
 
             } else {
-                // If no date range, just count physically available ones
-                availableForDates = allNonLostInstances.filter(inst => inst.status === 'Available').length;
+                availableForDates = itemInstances.filter(inst => (inst as any).status === 'Available').length;
             }
 
             let availabilityStatus: AvailabilityStatus;
@@ -89,149 +136,148 @@ export class InventoryService {
             } else if (availableForDates > 0) {
                 availabilityStatus = 'Available';
             } else if (item.quantity.available > 0) {
-                // There are physically available items, but they are all booked/blocked for these dates
                 availabilityStatus = 'Unavailable: Reserved';
             } else {
-                // There are no physically available items (all are reserved/in maintenance)
                 availabilityStatus = 'Unavailable: On Hold';
             }
 
-            const conditionSummary = allNonLostInstances.reduce((acc, instance) => {
-                acc[instance.condition] = (acc[instance.condition] || 0) + 1;
+            const conditionSummary = itemInstances.reduce((acc, instance) => {
+                const condition = (instance as any).condition;
+                acc[condition] = (acc[condition] || 0) + 1;
                 return acc;
             }, {} as Partial<Record<InventoryInstanceCondition, number>>);
 
-            catalogItems.push({ ...item, availabilityStatus, conditionSummary, availableForDates });
-        }
-
-        return JSON.parse(JSON.stringify(catalogItems));
+            return { ...item, availableForDates, availabilityStatus, conditionSummary } as InventoryItemForCatalog;
+        });
+        
+        return catalogItems;
     }
 
-
     static async createItem(itemData: { name: string; areaId: string }): Promise<InventoryItem> {
-        if (inventoryItems.some(item => item.name.toLowerCase() === itemData.name.toLowerCase() && item.areaId === itemData.areaId)) {
-            throw new Error(`An item with the name "${itemData.name}" already exists in this area.`);
+        const q = query(inventoryItemsCollection, where("name", "==", itemData.name), where("areaId", "==", itemData.areaId));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            throw new Error(`An item with the name \"${itemData.name}\" already exists in this area.`);
         }
-        const newItem: InventoryItem = {
-            id: `item-type-${inventoryItems.length + 10}`, // simple id generation for mock
+        const newItemData = {
             ...itemData,
             isHidden: false,
         };
-        inventoryItems.push(newItem);
-        return { ...newItem };
+        const docRef = await addDoc(inventoryItemsCollection, newItemData);
+        return { id: docRef.id, ...newItemData } as InventoryItem;
     }
 
     static async updateItem(id: string, updates: { name: string; areaId: string; isHidden?: boolean }): Promise<InventoryItem> {
-        const itemIndex = inventoryItems.findIndex(item => item.id === id);
-        if (itemIndex === -1) {
-            throw new Error('Inventory item not found.');
+        const itemRef = doc(db, "inventoryItems", id);
+        const itemSnap = await getDoc(itemRef);
+        if (!itemSnap.exists()) {
+             throw new Error('Inventory item not found.');
         }
-        if (inventoryItems.some(item => item.name.toLowerCase() === updates.name.toLowerCase() && item.areaId === updates.areaId && item.id !== id)) {
-            throw new Error(`An item with the name "${updates.name}" already exists in this area.`);
+        const wasHidden = itemSnap.data().isHidden;
+        
+        const q = query(inventoryItemsCollection, where("name", "==", updates.name), where("areaId", "==", updates.areaId));
+        const collisionSnapshot = await getDocs(q);
+        if (!collisionSnapshot.empty && collisionSnapshot.docs[0].id !== id) {
+             throw new Error(`An item with the name \"${updates.name}\" already exists in this area.`);
         }
+        
+        await updateDoc(itemRef, updates as any);
 
-        const wasHidden = inventoryItems[itemIndex].isHidden;
-        inventoryItems[itemIndex] = { ...inventoryItems[itemIndex], ...updates };
-
-        // Side effects for hiding/unhiding
         if (updates.isHidden && !wasHidden) {
-            // Item is being hidden. Set all instances to "Under Maintenance"
-            inventoryInstances.forEach(inst => {
-                if (inst.itemId === id) {
-                    inst.status = 'Under Maintenance';
-                }
+            const batch = writeBatch(db);
+            const instancesQuery = query(inventoryInstancesCollection, where("itemId", "==", id));
+            const instancesSnapshot = await getDocs(instancesQuery);
+            instancesSnapshot.forEach(instanceDoc => {
+                batch.update(instanceDoc.ref, { status: 'Under Maintenance' });
             });
+            await batch.commit();
         }
-
-        return { ...inventoryItems[itemIndex] };
+        
+        const updatedDoc = await getDoc(itemRef);
+        return { id: updatedDoc.id, ...updatedDoc.data() } as InventoryItem;
     }
 
     static async deleteItem(id: string): Promise<void> {
-        const itemIndex = inventoryItems.findIndex(item => item.id === id);
-        if (itemIndex !== -1) {
-            inventoryItems.splice(itemIndex, 1);
-            let i = inventoryInstances.length;
-            while (i--) {
-                if (inventoryInstances[i].itemId === id) {
-                    inventoryInstances.splice(i, 1);
-                }
-            }
-        }
+        const batch = writeBatch(db);
+        const itemRef = doc(db, "inventoryItems", id);
+        batch.delete(itemRef);
+
+        const instancesQuery = query(inventoryInstancesCollection, where("itemId", "==", id));
+        const instancesSnapshot = await getDocs(instancesQuery);
+        instancesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
     }
 
-    // --- Instance Methods ---
-
     static async getInstancesByItemId(itemId: string): Promise<InventoryInstance[]> {
-        const instances = inventoryInstances.filter(inst => inst.itemId === itemId && inst.condition !== 'Lost/Unusable');
-        return JSON.parse(JSON.stringify(instances));
+        const q = query(inventoryInstancesCollection, where("itemId", "==", itemId), where('condition', '!=', 'Lost/Unusable'));
+        return await this._getDocs(q) as InventoryInstance[];
     }
 
     static async createInstance(instanceData: Omit<InventoryInstance, 'id'>): Promise<InventoryInstance> {
-        const newInstance: InventoryInstance = {
-            id: `inst-${inventoryInstances.length + 10}`,
-            ...instanceData,
-        };
-        inventoryInstances.push(newInstance);
-        return { ...newInstance };
+        const docRef = await addDoc(inventoryInstancesCollection, instanceData);
+        return { id: docRef.id, ...instanceData } as InventoryInstance;
     }
 
     static async updateInstance(id: string, updates: Partial<Omit<InventoryInstance, 'id' | 'itemId'>>): Promise<InventoryInstance> {
-        const instanceIndex = inventoryInstances.findIndex(inst => inst.id === id);
-        if (instanceIndex === -1) {
-            throw new Error('Inventory instance not found.');
-        }
-        inventoryInstances[instanceIndex] = { ...inventoryInstances[instanceIndex], ...updates };
-        return { ...inventoryInstances[instanceIndex] };
+        const instanceRef = doc(db, "inventoryInstances", id);
+        await updateDoc(instanceRef, updates);
+        const updatedDoc = await getDoc(instanceRef);
+        return { id: updatedDoc.id, ...updatedDoc.data() } as InventoryInstance;
     }
 
     static async deleteInstance(id: string): Promise<void> {
-        const instanceIndex = inventoryInstances.findIndex(inst => inst.id === id);
-        if (instanceIndex !== -1) {
-            inventoryInstances.splice(instanceIndex, 1);
-        }
+        const instanceRef = doc(db, "inventoryInstances", id);
+        await deleteDoc(instanceRef);
     }
     
-    // --- Availability Check ---
-
     static async checkAvailability(request: AvailabilityRequest): Promise<InstanceAvailabilityResult[]> {
         const { startDate, endDate, itemIds } = request;
         const results: InstanceAvailabilityResult[] = [];
-
+        
         const datesInRange: string[] = [];
-        let currentDate = new Date(startDate + 'T00:00:00Z');
-        const lastDate = new Date(endDate + 'T00:00:00Z');
-        if (lastDate < currentDate) {
-            return [];
+        if (startDate && endDate) {
+            let currentDate = new Date(startDate + 'T00:00:00Z');
+            const lastDate = new Date(endDate + 'T00:00:00Z');
+            if (lastDate >= currentDate) {
+                while (currentDate <= lastDate) {
+                    datesInRange.push(currentDate.toISOString().split('T')[0]);
+                    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+                }
+            }
         }
-        while (currentDate <= lastDate) {
-            datesInRange.push(currentDate.toISOString().split('T')[0]);
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-        }
-
+        if (datesInRange.length === 0) return [];
+        
+        const reservationsQuery = query(equipmentRequestsCollection,
+            where('status', 'in', ['Submitted', 'Approved', 'Ready for Pickup']),
+            where('requestedEndDate', '>=', startDate),
+        );
+        const allReservations = (await this._getDocs(reservationsQuery)).filter(res => (res as any).requestedStartDate <= endDate);
+        
         for (const itemId of itemIds) {
-            const itemInfo = inventoryItems.find(i => i.id === itemId);
-            if (!itemInfo) continue;
+            const itemSnap = await getDoc(doc(db, "inventoryItems", itemId));
+            if (!itemSnap.exists()) continue;
+            const itemInfo = { id: itemSnap.id, ...itemSnap.data() } as InventoryItem;
 
-            const allInstancesOfItem = inventoryInstances.filter(inst => inst.itemId === itemId && inst.condition !== 'Lost/Unusable');
+            const instancesOfItemQuery = query(inventoryInstancesCollection, where("itemId", "==", itemId), where("condition", "!=", "Lost/Unusable"));
+            const allInstancesOfItem = await this._getDocs(instancesOfItemQuery);
             
-            const availableAndNotBlockedInstances = allInstancesOfItem.filter(inst => 
-                inst.status === 'Available' && 
-                !(inst.blockedDates && inst.blockedDates.some(d => datesInRange.includes(d)))
+            const availableAndNotBlockedInstances = allInstancesOfItem.filter(inst =>
+                (inst as any).status === 'Available' &&
+                !((inst as any).blockedDates && (inst as any).blockedDates.some((d: string) => datesInRange.includes(d)))
             );
 
             let maxConcurrentReservations = 0;
-
             for (const date of datesInRange) {
-                const reservationsOnDate = equipmentRequests.filter(res =>
-                    res.requestedStartDate <= date && res.requestedEndDate >= date &&
-                    ['Pending Confirmation', 'For Approval', 'Ready for Pickup'].includes(res.status)
+                const reservationsOnDate = allReservations.filter(res =>
+                    (res as any).requestedStartDate <= date && (res as any).requestedEndDate >= date
                 );
-
                 const bookedCountOnDate = reservationsOnDate.reduce((count, req) => {
-                    const itemCountInRequest = req.requestedItems.filter(reqItem => reqItem.itemId === itemInfo.id).length;
+                    const itemCountInRequest = ((req as any).requestedItems || []).filter((reqItem: any) => reqItem.itemId === itemInfo.id).length;
                     return count + itemCountInRequest;
                 }, 0);
-
                 if (bookedCountOnDate > maxConcurrentReservations) {
                     maxConcurrentReservations = bookedCountOnDate;
                 }
@@ -241,7 +287,7 @@ export class InventoryService {
 
             let availableInstances: InventoryInstance[] = [];
             if (guaranteedAvailableCount > 0) {
-                availableInstances = availableAndNotBlockedInstances.slice(0, guaranteedAvailableCount);
+                 availableInstances = availableAndNotBlockedInstances.slice(0, guaranteedAvailableCount) as InventoryInstance[];
             }
 
             results.push({
@@ -250,7 +296,6 @@ export class InventoryService {
                 availableInstances,
             });
         }
-
         return results;
     }
 }
