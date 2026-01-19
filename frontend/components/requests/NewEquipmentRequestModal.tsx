@@ -160,9 +160,9 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
         if (user.role === 'student') {
-            if (!endorserName.trim()) { setError("Endorser's name is required."); return; }
-            if (!endorserPosition.trim()) { setError("Endorser's position is required."); return; }
-            if (!endorserEmail.trim()) { setError("Endorser's email is required."); return; }
+            if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
+            if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
+            if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
         }
         if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
         if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
@@ -177,20 +177,25 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 instanceId: instance.id,
             }));
 
-            await createEquipmentRequestApi({
+            const requestData: any = {
                 userId: user.id,
                 userName: `${user.firstName} ${user.lastName}`,
                 userContact: user.emailAddress,
                 purpose,
-                endorserName: user.role === 'student' ? endorserName : undefined,
-                endorserPosition: user.role === 'student' ? endorserPosition : undefined,
-                endorserEmail: user.role === 'student' ? endorserEmail : undefined,
                 requestedStartDate: currentStartDate,
                 requestedEndDate: currentEndDate,
                 secondaryContactName,
                 secondaryContactNumber,
                 requestedItems: requestedItemsPayload,
-            });
+            };
+
+            if (user.role === 'student') {
+                requestData.endorserName = endorserName;
+                requestData.endorserPosition = endorserPosition;
+                requestData.endorserEmail = endorserEmail;
+            }
+
+            await createEquipmentRequestApi(requestData);
             onSuccess();
         } catch (err: any) {
             setError(err.message || 'Failed to create equipment request.');

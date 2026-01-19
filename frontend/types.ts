@@ -1,332 +1,209 @@
-export type UserRole = 'guest' | 'faculty' | 'student' | 'user' | 'admin' | 'superadmin';
+
+// Main data types used throughout the frontend application
 
 export interface User {
-  id: string;
-  emailAddress: string;
-  emailVerified: boolean;
-  role: UserRole;
-  firstName: string;
-  lastName: string;
-  contactNumber?: string;
-  idNumber?: string;
-  program?: string;
-  managedAreaIds?: string[];
-  createdAt: string;
-  lastLogin?: string;
+    id: string;
+    email: string;
+    name: string;
+    role: 'student' | 'admin' | 'superadmin' | 'faculty';
+    photoURL?: string;
+    // Optional fields based on your user schema
+    firstName?: string;
+    lastName?: string;
+    emailAddress?: string;
 }
 
 export interface Area {
-  id: string;
-  name: string;
-}
-
-export interface ReservationSettings {
-  minimumLeadDays: number;
-  penaltyAmount: number;
-  penaltyInterval: 'per_day' | 'per_hour';
-}
-
-// --- NEW Equipment Request Model ---
-export type EquipmentRequestStatus =
-  | 'Pending Confirmation'
-  | 'For Approval'
-  | 'Ready for Pickup'
-  | 'Closed'
-  | 'Rejected'
-  | 'Cancelled';
-
-export const AllEquipmentRequestStatuses: EquipmentRequestStatus[] = [
-  'Pending Confirmation',
-  'For Approval',
-  'Ready for Pickup',
-  'Closed',
-  'Rejected',
-  'Cancelled',
-];
-
-export interface EquipmentRequest {
-  id: string;
-  userId: string;
-  userName: string; // denormalized for easier display
-  userContact: string;
-  endorserEmail?: string;
-  endorserName?: string;
-  endorserPosition?: string;
-  
-  // Admin/Faculty IDs
-  endorsedByFacultyId?: string | null;
-  approvedByAdminId?: string | null;
-  releasedByAdminId?: string | null;
-  returnCheckedByAdminId?: string | null;
-
-  status: EquipmentRequestStatus;
-  purpose: string;
-  dateFiled: string; // ISO 8601
-  requestedStartDate: string; // YYYY-MM-DD
-  requestedEndDate: string; // YYYY-MM-DD
-  
-  scheduledPickup?: string | null; // ISO 8601
-  scheduledReturn?: string | null; // ISO 8601
-  actualPickup?: string | null; // ISO 8601
-  actualReturn?: string | null; // ISO 8601
-
-  rejectionReason?: string | null;
-  cancelledAt?: string | null; // ISO 8601
-  cancelledByUserId?: string | null;
-  
-  isFlaggedNoShow: boolean;
-  secondaryContactName: string;
-  secondaryContactNumber: string;
-
-  requestedItems: {
-    itemId: string;
+    id: string;
     name: string;
-    areaId: string;
-    instanceId?: string | null; // Assigned at pickup
-  }[];
-
-  returnDetails?: {
-    condition: 'Good' | 'Damaged' | 'Incomplete';
-    notes: string;
-    returnedAt: string; // ISO 8601 Date string
-  };
-  
-  // AirSlate integration for multi-level approval
-  airSlateDocumentId?: string;
-  airSlateStatus?: 'Pending Signature' | 'Completed' | 'Rejected';
-  airSlateDocumentUrl?: string;
+    description: string;
 }
-
-// --- NEW Room Request Model ---
-export type RoomRequestStatus =
-  | 'Pending Confirmation'
-  | 'For Approval'
-  | 'Ready for Check-in'
-  | 'Overdue'
-  | 'Closed'
-  | 'Rejected'
-  | 'Cancelled';
-
-export const AllRoomRequestStatuses: RoomRequestStatus[] = [
-  'Pending Confirmation',
-  'For Approval',
-  'Ready for Check-in',
-  'Overdue',
-  'Closed',
-  'Rejected',
-  'Cancelled',
-];
-
-export interface RoomRequest {
-  id: string;
-  userId: string;
-  userName: string; // denormalized
-  userContact: string;
-  instanceId?: string | null; // Assigned when a specific room instance is booked
-  endorserEmail?: string;
-  endorserName?: string;
-  endorserPosition?: string;
-
-  // Admin/Faculty IDs
-  endorsedByFacultyId?: string | null;
-  approvedByAdminId?: string | null;
-  
-  status: RoomRequestStatus;
-  
-  dateFiled: string; // ISO 8601
-  requestedStartDate: string; // YYYY-MM-DD
-  requestedEndDate: string; // YYYY-MM-DD
-  requestedStartTime: string; // HH:MM
-  requestedEndTime: string; // HH:MM
-  
-  purpose: string;
-  numberOfStudents: number;
-  accompanyingStudents: string; // Text field for names
-  
-  checkedInAt?: string | null; // ISO 8601
-  checkedOutAt?: string | null; // ISO 8601
-
-  rejectionReason?: string | null;
-  cancelledAt?: string | null; // ISO 8601
-  cancelledByUserId?: string | null;
-  isFlaggedNoShow: boolean;
-
-  // Link to room
-  requestedRoom: {
-    roomTypeId: string;
-    name: string;
-    areaId: string;
-  };
-  
-  // AirSlate integration for multi-level approval
-  airSlateDocumentId?: string;
-  airSlateStatus?: 'Pending Signature' | 'Completed' | 'Rejected';
-  airSlateDocumentUrl?: string;
-}
-
-
-export interface Penalty {
-  id: string;
-  userId: string;
-  // A penalty is now linked to a specific request type
-  equipmentRequestId?: string;
-  roomRequestId?: string;
-  amount: number;
-  reason: string;
-  isPaid: boolean;
-  createdAt: string; // ISO 8601 Date string
-}
-
-
-export interface Notification {
-  id: string;
-  userId: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string; // ISO 8601 Date string
-  // A notification can be linked to a specific request
-  equipmentRequestId?: string;
-  roomRequestId?: string;
-}
-
-
-// --- Inventory (Unchanged) ---
-export type AvailabilityStatus =
-  | 'Available'
-  | 'Unavailable: On Hold'
-  | 'Unavailable: Reserved'
-  | 'Unavailable: Under Maintenance'
-  | 'Unavailable: No Instances';
-
-export type InventoryInstanceStatus = 'Available' | 'Reserved' | 'Under Maintenance';
-export type InventoryInstanceCondition = 'Good' | 'Damaged' | 'Lost/Unusable';
 
 export interface InventoryItem {
     id: string;
     name: string;
+    description: string;
     areaId: string;
-    description?: string;
-    photoUrl?: string;
-    isHidden?: boolean;
+    imageUrl?: string;
+    isReservable: boolean;
+    // This will be populated by instance data
+    totalStock: number; 
+    instances: InventoryInstance[];
 }
 
 export interface InventoryInstance {
     id: string;
     itemId: string;
     serialNumber: string;
-    status: InventoryInstanceStatus;
-    condition: InventoryInstanceCondition;
-    notes?: string;
-    photoUrls?: string[];
-    blockedDates?: string[];
-    assetTag?: string;
-    purchaseDate?: string; // YYYY-MM-DD
-    warrantyEndDate?: string; // YYYY-MM-DD
-    lastMaintenanceDate?: string; // YYYY-MM-DD
+    status: 'available' | 'in-use' | 'under-maintenance';
+    condition: 'new' | 'good' | 'fair' | 'poor';
 }
-
-export interface InventoryItemWithQuantity extends InventoryItem {
-    quantity: {
-        total: number;
-        available: number;
-        reserved: number;
-        underMaintenance: number;
-    };
-}
-
-export interface InventoryItemForCatalog extends InventoryItemWithQuantity {
-    availabilityStatus: AvailabilityStatus;
-    conditionSummary: Partial<Record<InventoryInstanceCondition, number>>;
-    availableForDates: number;
-}
-
-export interface EquipmentCartEntry {
-  item: InventoryItemForCatalog;
-  quantity: number;
-}
-
-
-export interface AvailabilityRequest {
-    startDate: string; // YYYY-MM-DD
-    endDate: string; // YYYY-MM-DD
-    itemIds: string[];
-}
-
-export interface InstanceAvailabilityResult {
-    itemId: string;
-    itemName: string;
-    availableInstances: InventoryInstance[];
-}
-
-// --- Rooms (Unchanged) ---
-export type RoomStatus = 'Available' | 'In Use' | 'Under Maintenance';
-export type RoomCondition = 'Newly Renovated' | 'Good' | 'Fair' | 'Poor';
 
 export interface RoomType {
     id: string;
-    name: string; // e.g., "Conference Room", "Podcast Studio"
+    name: string;
+    description: string;
     areaId: string;
-    description?: string;
-    photoUrl?: string;
-    isHidden?: boolean;
+    capacity: number;
+    imageUrl?: string;
+    isReservable: boolean;
+    instances: RoomInstance[];
 }
 
 export interface RoomInstance {
     id: string;
     roomTypeId: string;
-    name: string; // e.g., "Conference Room A", "Podcast Studio 1"
-    status: RoomStatus;
-    condition: RoomCondition;
-    notes?: string;
-    photoUrls?: string[];
-    blockedDates?: string[];
-    capacity?: number;
-    features?: string[];
-    lastCleanedDate?: string; // YYYY-MM-DD
+    name: string; // e.g., "Room 101", "Mac Lab A"
+    status: 'available' | 'occupied' | 'under-maintenance';
 }
 
-export interface RoomTypeWithQuantity extends RoomType {
-     quantity: {
-        total: number;
-        available: number;
-        inUse: number;
-        underMaintenance: number;
+// For displaying in catalog with availability info
+export interface InventoryItemForCatalog extends InventoryItem {
+    availabilityStatus: 'Available' | 'Unavailable' | 'Partially Available';
+    availableCount: number;
+}
+export interface RoomTypeForCatalog extends RoomType {
+    availabilityStatus: 'Available' | 'Unavailable';
+    availableInstancesCount: number;
+}
+
+export const AllEquipmentRequestStatuses = ['pending-endorsement', 'pending-approval', 'approved', 'rejected', 'in-use', 'completed', 'cancelled'] as const;
+export type EquipmentRequestStatus = typeof AllEquipmentRequestStatuses[number];
+
+export interface EquipmentRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    userContact: string;
+
+    purpose: string;
+    status: EquipmentRequestStatus;
+    
+    endorserName?: string;
+    endorserPosition?: string;
+    endorserEmail?: string;
+
+    requestedStartDate: string;
+    requestedEndDate: string;
+    
+    secondaryContactName: string;
+    secondaryContactNumber: string;
+
+    requestedItems: {
+        itemId: string;
+        name: string;
+        areaId: string;
+        instanceId: string;
+    }[];
+
+    assignedItems?: {
+        [itemId: string]: string; // Maps item ID to an instance ID
+    };
+
+    approvedBy?: string; // Admin User ID
+    rejectionReason?: string;
+    cancellationReason?: string;
+
+    createdAt: string; // ISO string
+    approvedAt?: string;
+    rejectedAt?: string;
+    endorsedAt?: string;
+    collectedAt?: string; // When items were picked up
+    returnedAt?: string; // When items were returned
+}
+
+export const AllRoomRequestStatuses = ['pending-endorsement', 'pending-approval', 'approved', 'rejected', 'active', 'completed', 'cancelled', 'no-show'] as const;
+export type RoomRequestStatus = typeof AllRoomRequestStatuses[number];
+
+export interface RoomRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    userContact: string;
+
+    purpose: string;
+    status: RoomRequestStatus;
+    
+    endorserName?: string;
+    endorserPosition?: string;
+    endorserEmail?: string;
+
+    requestedStartDate: string;
+    requestedEndDate: string;
+    requestedStartTime: string;
+    requestedEndTime: string;
+    
+    numberOfStudents: number;
+    accompanyingStudents: string;
+    
+    requestedRoom: {
+        roomTypeId: string;
+        name: string;
+        areaId: string;
+    };
+    instanceId?: string; // Assigned Room Instance ID
+
+    isFlaggedNoShow: boolean;
+    
+    approvedBy?: string; // Admin User ID
+    rejectionReason?: string;
+    cancellationReason?: string;
+
+    createdAt: string; // ISO string
+    approvedAt?: string;
+    rejectedAt?: string;
+    endorsedAt?: string;
+}
+
+export interface Reservation {
+    id: string;
+    type: 'equipment' | 'room';
+    request: EquipmentRequest | RoomRequest;
+}
+
+export interface CalendarEvent {
+    id: string;
+    title: string;
+    start: string; // ISO String
+    end: string; // ISO String
+    allDay: boolean;
+    resourceId?: string; // Links to equipment or room instance
+    extendedProps: {
+        type: 'equipment' | 'room' | 'maintenance' | 'blackout';
+        requestType?: 'request' | 'reservation';
+        status: string;
+        description: string;
+        requesterName?: string;
+        [key: string]: any;
     };
 }
 
-export interface RoomTypeForCatalog extends RoomTypeWithQuantity {
-    availabilityStatus: AvailabilityStatus;
-    availableForDates: number;
+export interface SystemSetting {
+    id: string; // e.g., 'minimumLeadDays', 'maxReservationDays'
+    value: any;
+    description: string;
 }
 
 
-export interface RoomAvailabilityRequest {
-    startDate: string; // YYYY-MM-DD
-    endDate: string; // YYYY-MM-DD
-    roomTypeIds: string[];
-}
-
-export interface RoomInstanceAvailabilityResult {
-    roomTypeId: string;
-    roomTypeName: string;
-    availableInstances: RoomInstance[];
-}
-
-// --- Calendar (Unchanged) ---
-export type AvailabilityLevel = 'high' | 'medium' | 'low' | 'none';
-
-export interface DailyAvailability {
-    date: string; // YYYY-MM-DD
-    level: AvailabilityLevel;
-    total: number;
-    booked: number;
-}
-
-export interface ItemDailyStatus {
+export interface Notification {
     id: string;
-    name: string;
-    areaId: string;
-    totalInstances: number;
-    bookedInstances: number;
-    isFullyBooked: boolean;
+    userId: string;
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string; // ISO string
+    link?: string; // Optional link to navigate to
+}
+
+export interface Penalty {
+  id: string;
+  userId: string;
+  userName: string;
+  requestType: 'equipment' | 'room';
+  requestId: string;
+  reason: 'Late Return' | 'Damaged Equipment' | 'Room No-Show' | 'Other';
+  details: string; // e.g., "Item: Projector, SN: 123 returned 2 days late."
+  amount: number;
+  isPaid: boolean;
+  createdAt: string; // ISO string
 }

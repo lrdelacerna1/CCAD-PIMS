@@ -129,14 +129,11 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
         setIsLoading(true);
         setError('');
         try {
-            await createRoomRequestApi({
+            const requestData: any = {
                 userId: user.id,
                 userName: `${user.firstName} ${user.lastName}`,
-                userContact: user.email,
+                userContact: user.emailAddress,
                 instanceId: activeRoomInfo?.instance?.id,
-                endorserName: user.role === 'user' ? endorserName : undefined,
-                endorserPosition: user.role === 'user' ? endorserPosition : undefined,
-                endorserEmail: user.role === 'user' ? endorserEmail : undefined,
                 purpose,
                 requestedStartDate: currentStartDate,
                 requestedEndDate: currentEndDate,
@@ -150,7 +147,15 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
                     name: activeRoomType.name,
                     areaId: activeRoomType.areaId,
                 },
-            });
+            };
+
+            if (user.role === 'user') {
+                requestData.endorserName = endorserName;
+                requestData.endorserPosition = endorserPosition;
+                requestData.endorserEmail = endorserEmail;
+            }
+
+            await createRoomRequestApi(requestData);
             onSuccess();
         } catch (err: any) {
             setError(err.message || 'Failed to create room request.');

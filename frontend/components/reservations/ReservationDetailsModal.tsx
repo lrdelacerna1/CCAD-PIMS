@@ -1,5 +1,5 @@
 import React from 'react';
-import { EquipmentRequest, RoomRequest } from '../../types';
+import { EquipmentRequest, RoomRequest, Penalty } from '../../types';
 import { Button } from '../ui/Button';
 import { format } from 'date-fns';
 import {
@@ -11,6 +11,9 @@ import {
     ExclamationTriangleIcon,
     DocumentDuplicateIcon,
 } from '../Icons';
+import { useAuth } from '../../hooks/useAuth';
+import { createPenaltyApi } from '../../../backend/api/penalties';
+import { updateRoomRequestStatusApi } from '../../../backend/api/roomRequests';
 
 type AnyRequest = EquipmentRequest | RoomRequest;
 
@@ -31,6 +34,7 @@ const StatusBadge: React.FC<{ status: string, large?: boolean }> = ({ status, la
         'closed': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
         'cancelled': 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
         'checked': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+        'no-show': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
     };
     return <span className={`${baseClasses} ${colors[colorKey] || colors['closed']}`}>{status}</span>;
 };
@@ -63,8 +67,30 @@ const ConditionalInfoCard: React.FC<{ icon: React.ReactNode; title: string; chil
 const ReservationDetailsModal: React.FC<{
     reservation: AnyRequest;
     onClose: () => void;
-}> = ({ reservation, onClose }) => {
+    onUpdate?: () => void;
+}> = ({ reservation, onClose, onUpdate }) => {
+    const { user } = useAuth();
     const isEquipment = 'requestedItems' in reservation;
+
+    const handleFlagNoShow = async () => {
+        if (isEquipment) return;
+
+        const penalty: Omit<Penalty, 'id'> = {
+            userId: reservation.userId,
+            userName: reservation.userName,
+            requestType: 'room',
+            requestId: reservation.id,
+            reason: 'Room No-Show',
+            details: `User did not show up for the room reservation for ${reservation.requestedRoom.name}`,
+            amount: 25, // Example amount
+            isPaid: false,
+            createdAt: new Date().toISOString(),
+        };
+        await createPenaltyApi(penalty);
+        await updateRoomRequestStatusApi(reservation.id, 'no-show');
+        if(onUpdate) onUpdate();
+        onClose();
+    };
 
     const startDateStr = format(new Date(reservation.requestedStartDate + 'T00:00:00Z'), 'yyyy-MM-dd');
     const endDateStr = format(new Date(reservation.requestedEndDate + 'T00:00:00Z'), 'yyyy-MM-dd');
@@ -198,7 +224,14 @@ const ReservationDetailsModal: React.FC<{
 
                 </div>
 
-                <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
+                <div className="p-6 flex justify-between items-center border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
+                    <div>
+                        {user?.role === 'admin' && !isEquipment && reservation.status === 'approved' && (
+                            <Button onClick={handleFlagNoShow} variant="warning" className="!w-auto">
+                                Flag as No-Show
+                            </Button>
+                        )}
+                    </div>
                     <Button onClick={onClose} className="!w-auto" variant="secondary">
                         Close
                     </Button>
