@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Area, RoomTypeWithQuantity, RoomTypeForCatalog, RoomInstance, User } from '../../types';
-import { createRoomRequestApi } from '../../../backend/api/roomRequests';
-import { getRoomCatalogApi, checkRoomAvailabilityApi } from '../../../backend/api/rooms';
+import { createRoomRequestApi, RoomRequestData } from '../../api/roomRequests';
+import { getRoomCatalogApi, checkRoomAvailabilityApi } from '../../api/rooms';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
@@ -129,7 +129,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
         setIsLoading(true);
         setError('');
         try {
-            const requestData: any = {
+            const requestData: RoomRequestData = {
                 userId: user.id,
                 userName: `${user.firstName} ${user.lastName}`,
                 userContact: user.emailAddress,
