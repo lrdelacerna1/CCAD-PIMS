@@ -3,12 +3,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Area, InventoryItem, InventoryItemForCatalog, InventoryInstance, User } from '../../types';
 import { createEquipmentRequestApi } from '../../../backend/api/equipmentRequests';
-import { getInventoryCatalogApi, checkAvailabilityApi, getInventoryApi } from '../../../backend/api/inventory';
+import { getInventoryCatalogApi, checkAvailabilityApi } from '../../../backend/api/inventory';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
-import { InformationCircleIcon, XIcon, MailIcon, UserIcon } from '../Icons';
+import { InformationCircleIcon, XIcon, MailIcon, UserIcon, PencilIcon } from '../Icons';
 import { Select } from '../ui/Select';
+import { Checkbox } from '../ui/Checkbox';
 
 interface EquipmentCartInstanceEntry {
   item: InventoryItemForCatalog;
@@ -18,8 +19,8 @@ interface EquipmentCartInstanceEntry {
 interface NewEquipmentRequestModalProps {
     areas: Area[];
     onClose: () => void;
-    onSuccess: () => void;
-    items: Map<string, EquipmentCartInstanceEntry>; // Key is instance ID
+    onSuccess: (message?: string, isSignatureRedirect?: boolean) => void; 
+    items: Map<string, EquipmentCartInstanceEntry>; 
     startDate: string;
     endDate: string;
     minimumLeadDays: number;
@@ -43,6 +44,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
     const [endorserName, setEndorserName] = useState('');
     const [endorserPosition, setEndorserPosition] = useState('');
     const [endorserEmail, setEndorserEmail] = useState('');
+    const [termsAccepted, setTermsAccepted] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -59,7 +61,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
     })();
 
     useEffect(() => {
-        if (items.size > 0) return; // Don't fetch if items are pre-filled
+        if (items.size > 0) return;
 
         const handler = setTimeout(() => {
             const fetchAvailableInstances = async () => {
@@ -150,23 +152,15 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user) {
-            setError('You must be logged in to make a request.');
-            return;
-        }
-        if (requestItems.size === 0) {
-            setError('Please add at least one item to your request.');
-            return;
-        }
+        if (!user) { setError('You must be logged in.'); return; }
+        if (requestItems.size === 0) { setError('Please add at least one item.'); return; }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
-        if (user.role === 'student') {
-            if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
-            if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
-            if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
+        if (user.role === 'student' && (!endorserName.trim() || !endorserPosition.trim() || !endorserEmail.trim())) {
+            setError("All endorser fields are required for students."); return;
         }
-        if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
-        if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
-        
+        if (!secondaryContactName.trim() || !secondaryContactNumber.trim()) { setError('Secondary contact information is required.'); return; }
+        if (!termsAccepted) { setError('You must accept the terms to proceed.'); return; }
+
         setIsLoading(true);
         setError('');
         try {
@@ -187,6 +181,8 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 secondaryContactName,
                 secondaryContactNumber,
                 requestedItems: requestedItemsPayload,
+                status: 'pending-signature', 
+                createdAt: new Date().toISOString(),
             };
 
             if (user.role === 'student') {
@@ -195,11 +191,16 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 requestData.endorserEmail = endorserEmail;
             }
 
-            await createEquipmentRequestApi(requestData);
-            onSuccess();
+            const response = await createEquipmentRequestApi(requestData);
+            
+            // The API now returns a URL. We inform the user and then redirect.
+            onSuccess('Your request has been submitted! Redirecting you to complete the signature process...', true);
+            
+            // Redirect the user to the signing URL in the same tab
+            window.location.href = response.airSlateDocumentUrl;
+
         } catch (err: any) {
-            setError(err.message || 'Failed to create equipment request.');
-        } finally {
+            setError(err.message || 'Failed to initiate equipment request signature.');
             setIsLoading(false);
         }
     };
@@ -357,6 +358,29 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                             />
                         </div>
 
+                        <div className="space-y-4 pt-4 border-t dark:border-slate-600">
+                            <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Signature & Agreement</h4>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="flex items-center gap-2">
+                                    <PencilIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                                    <h5 className="font-semibold text-blue-800 dark:text-blue-200 text-sm">E-Signature Required</h5>
+                                </div>
+                                <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                                    Upon submission, this request will be routed for digital signatures. You will receive an email from our provider, AirSlate, to sign the document. Your request will not be processed until your signature is complete. If an endorser is required, they will be asked to sign after you.
+                                </p>
+                            </div>
+                            <Checkbox
+                                id="terms-acceptance"
+                                checked={termsAccepted}
+                                onChange={(e) => setTermsAccepted(e.target.checked)}
+                                label={
+                                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                                        I acknowledge that my electronic signature will be required. I also agree to the following terms:
+                                    </span>
+                                }
+                            />
+                        </div>
+                        
                         <div className="p-3 bg-amber-50 dark:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800">
                             <div className="flex items-center gap-2">
                                 <InformationCircleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
@@ -371,7 +395,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
 
                     <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
                         <Button type="button" onClick={onClose} className="!w-auto" variant="secondary">Cancel</Button>
-                        <Button type="submit" isLoading={isLoading} className="!w-auto">Submit Request</Button>
+                        <Button type="submit" isLoading={isLoading} disabled={!termsAccepted} className="!w-auto">Submit for Signature</Button>
                     </div>
                 </form>
             </div>

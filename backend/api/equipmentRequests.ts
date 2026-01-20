@@ -1,5 +1,6 @@
 import { EquipmentRequest, EquipmentRequestStatus } from '../../frontend/types';
 import { EquipmentRequestService } from '../services/equipmentRequestService';
+import { AirSlateService } from '../services/airSlateService';
 
 const simulateNetworkDelay = <T>(data: T): Promise<T> => new Promise(resolve => setTimeout(() => resolve(data), 300));
 
@@ -13,9 +14,17 @@ export const getEquipmentRequestsByUserIdApi = async (userId: string): Promise<E
     return simulateNetworkDelay(data);
 };
 
-export const createEquipmentRequestApi = async (data: Omit<EquipmentRequest, 'id' | 'status' | 'dateFiled'>): Promise<EquipmentRequest> => {
-    const newRequest = await EquipmentRequestService.create(data);
-    return simulateNetworkDelay(newRequest);
+export const createEquipmentRequestApi = async (data: Omit<EquipmentRequest, 'id' | 'status' | 'createdAt' | 'airSlateDocumentId' | 'airSlateSignedAt'>): Promise<{ airSlateDocumentUrl: string }> => {
+    console.log('[API] Initiating AirSlate workflow for new Equipment Request');
+    const workflowResult = AirSlateService.initiateWorkflow(data, 'equipment');
+
+    if (!workflowResult) {
+        throw new Error('Failed to initiate AirSlate workflow.');
+    }
+
+    // Instead of creating the request directly, we return the URL for the user to sign.
+    // The actual request creation will happen via the webhook after signing is complete.
+    return simulateNetworkDelay({ airSlateDocumentUrl: workflowResult.airSlateDocumentUrl });
 };
 
 export const updateEquipmentRequestStatusApi = async (ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> => {

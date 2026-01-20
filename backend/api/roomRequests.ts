@@ -1,5 +1,6 @@
 import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
 import { RoomRequestService } from '../services/roomRequestService';
+import { AirSlateService } from '../services/airSlateService';
 
 const simulateNetworkDelay = <T>(data: T): Promise<T> => new Promise(resolve => setTimeout(() => resolve(data), 300));
 
@@ -13,9 +14,15 @@ export const getRoomRequestsByUserIdApi = async (userId: string): Promise<RoomRe
     return simulateNetworkDelay(data);
 };
 
-export const createRoomRequestApi = async (data: Omit<RoomRequest, 'id' | 'status' | 'dateFiled'>): Promise<RoomRequest> => {
-    const newRequest = await RoomRequestService.create(data);
-    return simulateNetworkDelay(newRequest);
+export const createRoomRequestApi = async (data: Omit<RoomRequest, 'id' | 'status' | 'createdAt' | 'isFlaggedNoShow' | 'airSlateDocumentId' | 'airSlateSignedAt'>): Promise<{ airSlateDocumentUrl: string }> => {
+    console.log('[API] Initiating AirSlate workflow for new Room Request');
+    const workflowResult = AirSlateService.initiateWorkflow(data, 'room');
+
+    if (!workflowResult) {
+        throw new Error('Failed to initiate AirSlate workflow.');
+    }
+
+    return simulateNetworkDelay({ airSlateDocumentUrl: workflowResult.airSlateDocumentUrl });
 };
 
 export const updateRoomRequestStatusApi = async (ids: string[], status: RoomRequestStatus, rejectionReason?: string): Promise<void> => {

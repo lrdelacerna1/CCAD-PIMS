@@ -1,0 +1,76 @@
+###
+# Mock Webhook: Simulate AirSlate completing an EQUIPMENT request signature
+# This endpoint is handled by `backend/api/airslate.ts`
+POST http://localhost:3000/api/airslate-webhook
+Content-Type: application/json
+
+{
+  "documentId": "as-doc-mock-equip-123",
+  "status": "signed",
+  "signedData": {
+    "requestType": "equipment",
+    "request": {
+      "userId": "user-1",
+      "userName": "John Doe",
+      "userContact": "john.doe@example.com",
+      "purpose": "Final Year Project - Robotics Arm",
+      "requestedStartDate": "2024-06-10",
+      "requestedEndDate": "2024-06-15",
+      "endorserName": "Prof. Jane Smith",
+      "endorserPosition": "Professor",
+      "endorserEmail": "jane.smith@example.com",
+      "secondaryContactName": "Project Mate",
+      "secondaryContactNumber": "09171234567",
+      "requestedItems": [
+        {
+          "itemId": "item-k2v3x4y5",
+          "name": "Arduino Uno",
+          "areaId": "area-1",
+          "instanceId": "inst-k2v3x4y5-1"
+        },
+        {
+          "itemId": "item-b8c9d0e1",
+          "name": "Soldering Iron",
+          "areaId": "area-1",
+          "instanceId": "inst-b8c9d0e1-3"
+        }
+      ]
+    }
+  }
+}
+
+###
+# Mock Webhook: Simulate AirSlate completing a ROOM request signature
+# This endpoint is handled by `backend/api/airslate.ts`
+POST http://localhost:3000/api/airslate-webhook
+Content-Type: application/json
+
+{
+  "documentId": "as-doc-mock-room-456",
+  "status": "signed",
+  "signedData": {
+    "requestType": "room",
+    "request": {
+        "userId": "user-2",
+        "userName": "Alice Johnson",
+        "userContact": "alice.j@example.com",
+        "purpose": "Team meeting for CS101 Project",
+        "requestedStartDate": "2024-06-11",
+        "requestedEndDate": "2024-06-11",
+        "requestedStartTime": "14:00",
+        "requestedEndTime": "16:00",
+        "endorserName": "Dr. Robert Brown",
+        "endorserPosition": "Department Chair",
+        "endorserEmail": "robert.brown@example.com",
+        "numberOfStudents": 5,
+        "accompanyingStudents": "Bob, Charlie, Diana, Eve",
+        "isFlaggedNoShow": false,
+        "requestedRoom": {
+            "roomTypeId": "room-type-a1b2",
+            "name": "Conference Room A",
+            "areaId": "area-2"
+        },
+        "instanceId": "inst-a1b2-1"
+    }
+  }
+}
