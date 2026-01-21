@@ -47,6 +47,19 @@ export class RoomRequestService {
         });
     }
 
+    static async getByEndorserEmail(endorserEmail: string): Promise<RoomRequest[]> {
+        const q = query(roomRequestsCollection, where("endorserEmail", "==", endorserEmail), orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as RoomRequest;
+        });
+    }
+
     static async create(data: Omit<RoomRequest, 'id' | 'status' | 'dateFiled'>): Promise<RoomRequest> {
         const userRef = doc(db, "users", data.userId);
         const userSnap = await getDoc(userRef);
@@ -56,7 +69,7 @@ export class RoomRequestService {
 
         const newRequestData: any = {
             ...data,
-            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
+            status: isAdminRequest ? 'For Approval' : 'For Endorsement',
             dateFiled: serverTimestamp(),
         };
 

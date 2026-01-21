@@ -6,7 +6,7 @@ import NotificationBell from './NotificationBell';
 import AboutModal from './AboutModal';
 
 const Header: React.FC = () => {
-  const { user, isSuperAdmin, isAdmin, isUser, signOut } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isFaculty, isUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -86,8 +86,8 @@ const Header: React.FC = () => {
                     Home
                  </NavLink>
 
-                {/* User Links */}
-                {isUser && (
+                {/* User & Faculty Links */}
+                {(isUser || isFaculty) && (
                   <>
                     <NavLink 
                         to="/catalog" 
@@ -106,6 +106,17 @@ const Header: React.FC = () => {
                   </>
                 )}
                 
+                {/* Faculty Links */}
+                {isFaculty && (
+                  <NavLink 
+                      to="/my-endorsements" 
+                      target="_self" 
+                      className={({ isActive }) => `${navItemClass} ${isActive ? activeNavItemClass : ''}`}
+                  >
+                      My Endorsements
+                  </NavLink>
+                )}
+
                 {/* Admin Dropdown */}
                 {(isSuperAdmin || isAdmin) && (
                   <div className="relative h-full flex items-center" ref={adminDropdownRef}>
@@ -199,12 +210,18 @@ const Header: React.FC = () => {
             {user ? (
               <>
                  <NavLink to="/" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Home</NavLink>
-                {/* User-specific links */}
-                {isUser && (
+                
+                {/* User & Faculty-specific links */}
+                {(isUser || isFaculty) && (
                   <>
                     <NavLink to="/catalog" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Catalog</NavLink>
                     <NavLink to="/my-reservations" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>My Reservations</NavLink>
                   </>
+                )}
+
+                {/* Faculty-specific links */}
+                {isFaculty && (
+                    <NavLink to="/my-endorsements" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>My Endorsements</NavLink>
                 )}
 
                 {/* Admin-specific links */}

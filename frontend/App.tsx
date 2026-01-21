@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
+import { FacultyRoute } from './components/auth/FacultyRoute';
 import Header from './components/layout/Header';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -15,6 +16,7 @@ import RequestsPage from './pages/RequestsPage';
 import AllRequestsPage from './pages/AllRequestsPage';
 import InventoryPage from './pages/InventoryPage';
 import MyReservationsPage from './pages/MyReservationsPage';
+import MyEndorsementsPage from './pages/MyEndorsementsPage';
 import CatalogPage from './pages/CatalogPage';
 import SettingsPage from './pages/SettingsPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -58,6 +60,13 @@ const App: React.FC = () => {
                   <ProtectedRoute>
                     <CatalogPage />
                   </ProtectedRoute>
+                }/>
+
+                {/* Faculty Routes */}
+                <Route path="/my-endorsements" element={
+                  <FacultyRoute>
+                    <MyEndorsementsPage />
+                  </FacultyRoute>
                 }/>
 
                 {/* Admin Routes */}

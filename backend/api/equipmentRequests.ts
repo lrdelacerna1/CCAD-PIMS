@@ -13,6 +13,11 @@ export const getEquipmentRequestsByUserIdApi = async (userId: string): Promise<E
     return simulateNetworkDelay(data);
 };
 
+export const getEquipmentRequestsByEndorserApi = async (endorserEmail: string): Promise<EquipmentRequest[]> => {
+    const data = await EquipmentRequestService.getByEndorserEmail(endorserEmail);
+    return simulateNetworkDelay(data);
+};
+
 export const createEquipmentRequestApi = async (data: Omit<EquipmentRequest, 'id' | 'status' | 'dateFiled'>): Promise<EquipmentRequest> => {
     const newRequest = await EquipmentRequestService.create(data);
     return simulateNetworkDelay(newRequest);

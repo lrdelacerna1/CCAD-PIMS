@@ -47,6 +47,19 @@ export class EquipmentRequestService {
         });
     }
 
+    static async getByEndorserEmail(endorserEmail: string): Promise<EquipmentRequest[]> {
+        const q = query(equipmentRequestsCollection, where("endorserEmail", "==", endorserEmail), orderBy("dateFiled", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dateFiled: (data.dateFiled as any).toDate().toISOString(),
+            } as EquipmentRequest;
+        });
+    }
+
     static async create(data: Omit<EquipmentRequest, 'id' | 'status' | 'dateFiled'>): Promise<EquipmentRequest> {
         const userRef = doc(db, "users", data.userId);
         const userSnap = await getDoc(userRef);
@@ -56,7 +69,7 @@ export class EquipmentRequestService {
 
         const newRequestData: any = {
             ...data,
-            status: isAdminRequest ? 'For Approval' : 'Pending Confirmation',
+            status: isAdminRequest ? 'For Approval' : 'For Endorsement',
             dateFiled: serverTimestamp(),
             isFlaggedNoShow: false, // Default value
         };

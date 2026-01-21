@@ -13,6 +13,11 @@ export const getRoomRequestsByUserIdApi = async (userId: string): Promise<RoomRe
     return simulateNetworkDelay(data);
 };
 
+export const getRoomRequestsByEndorserApi = async (endorserEmail: string): Promise<RoomRequest[]> => {
+    const data = await RoomRequestService.getByEndorserEmail(endorserEmail);
+    return simulateNetworkDelay(data);
+};
+
 export const createRoomRequestApi = async (data: Omit<RoomRequest, 'id' | 'status' | 'dateFiled'>): Promise<RoomRequest> => {
     const newRequest = await RoomRequestService.create(data);
     return simulateNetworkDelay(newRequest);

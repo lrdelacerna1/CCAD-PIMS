@@ -13,6 +13,7 @@ export interface AuthContextType {
     loading: boolean;
     isSuperAdmin: boolean;
     isAdmin: boolean;
+    isFaculty: boolean;
     isUser: boolean;
     login: (email: string, pass: string) => Promise<void>;
     register: (userData: any) => Promise<void>;
@@ -30,6 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isFaculty, setIsFaculty] = useState(false);
     const [isUser, setIsUser] = useState(false);
     const auth = getAuth();
     const navigate = useNavigate();
@@ -49,10 +51,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     } as User;
                     setUser(userPayload);
                     const userRole = userPayload.role;
-                    const isAdminRole = userRole === 'admin' || userRole === 'superadmin';
-                    setIsSuperAdmin(userRole === 'superadmin');
+                    const isSuperAdminRole = userRole === 'superadmin';
+                    const isAdminRole = userRole === 'admin' || isSuperAdminRole;
+                    const isFacultyRole = userRole === 'faculty';
+
+                    setIsSuperAdmin(isSuperAdminRole);
                     setIsAdmin(isAdminRole);
-                    setIsUser(!isAdminRole);
+                    setIsFaculty(isFacultyRole);
+                    setIsUser(!isAdminRole && !isFacultyRole);
                 } else {
                     const newUser: Omit<User, 'id'> = {
                         emailAddress: firebaseUser.email || '',
@@ -68,12 +74,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setIsUser(true);
                     setIsAdmin(false);
                     setIsSuperAdmin(false);
+                    setIsFaculty(false);
                 }
                 await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
             } else {
                 setUser(null);
                 setIsSuperAdmin(false);
                 setIsAdmin(false);
+                setIsFaculty(false);
                 setIsUser(false);
             }
             setLoading(false);
@@ -135,10 +143,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     } as User;
                     setUser(userPayload);
                     const userRole = userPayload.role;
-                    const isAdminRole = userRole === 'admin' || userRole === 'superadmin';
-                    setIsSuperAdmin(userRole === 'superadmin');
+                    const isSuperAdminRole = userRole === 'superadmin';
+                    const isAdminRole = userRole === 'admin' || isSuperAdminRole;
+                    const isFacultyRole = userRole === 'faculty';
+
+                    setIsSuperAdmin(isSuperAdminRole);
                     setIsAdmin(isAdminRole);
-                    setIsUser(!isAdminRole);
+                    setIsFaculty(isFacultyRole);
+                    setIsUser(!isAdminRole && !isFacultyRole);
                 }
             }
         } else {
@@ -171,6 +183,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loading,
         isSuperAdmin,
         isAdmin,
+        isFaculty,
         isUser,
         login,
         register,
