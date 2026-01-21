@@ -48,9 +48,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         emailVerified: firebaseUser.emailVerified,
                     } as User;
                     setUser(userPayload);
-                    setIsSuperAdmin(userPayload.role === 'superadmin');
-                    setIsAdmin(userPayload.role === 'admin' || userPayload.role === 'superadmin');
-                    setIsUser(userPayload.role === 'user');
+                    const userRole = userPayload.role;
+                    const isAdminRole = userRole === 'admin' || userRole === 'superadmin';
+                    setIsSuperAdmin(userRole === 'superadmin');
+                    setIsAdmin(isAdminRole);
+                    setIsUser(!isAdminRole);
                 } else {
                     const newUser: Omit<User, 'id'> = {
                         emailAddress: firebaseUser.email || '',
@@ -63,7 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     };
                     await setDoc(userDocRef, newUser);
                     setUser({ id: firebaseUser.uid, ...newUser } as User);
-                    setIsUser(false);
+                    setIsUser(true);
                     setIsAdmin(false);
                     setIsSuperAdmin(false);
                 }
@@ -132,6 +134,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         emailVerified: reloadedFirebaseUser.emailVerified,
                     } as User;
                     setUser(userPayload);
+                    const userRole = userPayload.role;
+                    const isAdminRole = userRole === 'admin' || userRole === 'superadmin';
+                    setIsSuperAdmin(userRole === 'superadmin');
+                    setIsAdmin(isAdminRole);
+                    setIsUser(!isAdminRole);
                 }
             }
         } else {
@@ -148,11 +155,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const updateProfile = async (updates: Partial<User>) => {
         if (!user) throw new Error("No user is signed in.");
         try {
-            // First, update the data in the database.
             await authService.updateUser(user.id, updates);
             
-            // Then, update the local state by merging the updates into the existing user object.
-            // This ensures that properties not in the form (like emailVerified) are preserved.
             const newUserState = { ...user, ...updates };
             setUser(newUserState);
 

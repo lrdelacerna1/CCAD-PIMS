@@ -6,7 +6,7 @@ import NotificationBell from './NotificationBell';
 import AboutModal from './AboutModal';
 
 const Header: React.FC = () => {
-  const { user, isSuperAdmin, isAdmin, signOut } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -87,7 +87,7 @@ const Header: React.FC = () => {
                  </NavLink>
 
                 {/* User Links */}
-                {user.role === 'student' && (
+                {isUser && (
                   <>
                     <NavLink 
                         to="/catalog" 
@@ -200,7 +200,7 @@ const Header: React.FC = () => {
               <>
                  <NavLink to="/" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Home</NavLink>
                 {/* User-specific links */}
-                {user.role === 'student' && (
+                {isUser && (
                   <>
                     <NavLink to="/catalog" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Catalog</NavLink>
                     <NavLink to="/my-reservations" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>My Reservations</NavLink>
