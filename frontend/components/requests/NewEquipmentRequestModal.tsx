@@ -159,7 +159,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
             return;
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
-        if (user.role === 'student') {
+        if (user.role === 'student' || user.role === 'guest') {
             if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
             if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
             if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
@@ -189,7 +189,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 requestedItems: requestedItemsPayload,
             };
 
-            if (user.role === 'student') {
+            if (user.role === 'student' || user.role === 'guest') {
                 requestData.endorserName = endorserName;
                 requestData.endorserPosition = endorserPosition;
                 requestData.endorserEmail = endorserEmail;
@@ -313,7 +313,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
 
                         <div className="space-y-4">
                             <Textarea label="Purpose" id="purpose" value={purpose} onChange={e => setPurpose(e.target.value)} required />
-                            {user?.role === 'student' && (
+                            {(user?.role === 'student' || user?.role === 'guest') && (
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
                                     <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
                                     <Input 

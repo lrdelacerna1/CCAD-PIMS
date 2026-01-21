@@ -117,7 +117,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
         if (!activeRoomType) { setError('Please select a room.'); return; }
         if (new Date(`${startDate}T${requestedEndTime}`) <= new Date(`${startDate}T${requestedStartTime}`)) { setError('End time must be after start time.'); return; }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
-        if (isUser) {
+        if (user.role === 'student' || user.role === 'guest') {
             if (!endorserName.trim()) { setError("Endorser's name is required."); return; }
             if (!endorserPosition.trim()) { setError("Endorser's position is required."); return; }
             if (!endorserEmail.trim()) { setError("Endorser's email is required."); return; }
@@ -149,7 +149,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
                 },
             };
 
-            if (isUser) {
+            if (user.role === 'student' || user.role === 'guest') {
                 requestData.endorserName = endorserName;
                 requestData.endorserPosition = endorserPosition;
                 requestData.endorserEmail = endorserEmail;
@@ -256,7 +256,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
                                 <Input label="End Time" id="end-time" type="time" value={requestedEndTime} onChange={e => setRequestedEndTime(e.target.value)} required />
                             </div>
                             <Input label="Purpose" id="purpose" value={purpose} onChange={e => setPurpose(e.target.value)} required />
-                            {isUser && (
+                            {(user?.role === 'student' || user?.role === 'guest') && (
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
                                     <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
                                     <Input 
