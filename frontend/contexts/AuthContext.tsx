@@ -1,10 +1,11 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser, sendEmailVerification as firebaseSendEmailVerification, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { User } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { loginUserApi, signInWithGoogleApi } from '../../backend/api/auth';
+import { loginUserApi, registerUserApi, signInWithGoogleApi } from '../../backend/api/auth';
 import { authService } from '../services/authService';
 
 export interface AuthContextType {
@@ -14,6 +15,7 @@ export interface AuthContextType {
     isAdmin: boolean;
     isUser: boolean;
     login: (email: string, pass: string) => Promise<void>;
+    register: (userData: any) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
     sendVerificationEmail: () => Promise<void>;
     reloadUser: () => Promise<void>;
@@ -83,6 +85,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await loginUserApi(email, pass);
         } catch (error) {
             console.error("Login failed:", error);
+            throw error;
+        }
+    };
+
+    const register = async (userData: any) => {
+        try {
+            await registerUserApi(userData);
+        } catch (error) {
+            console.error("Registration failed:", error);
             throw error;
         }
     };
@@ -158,6 +169,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAdmin,
         isUser,
         login,
+        register,
         signInWithGoogle,
         sendVerificationEmail,
         reloadUser,
