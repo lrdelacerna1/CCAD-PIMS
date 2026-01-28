@@ -5,7 +5,7 @@ import { UserIcon, LogoIcon, MenuIcon, XIcon, ChevronDownIcon } from '../Icons';
 import NotificationBell from './NotificationBell';
 import AboutModal from './AboutModal';
 
-const Header: React.FC = () => {
+const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) => {
   const { user, isSuperAdmin, isAdmin, isFaculty, isUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -76,7 +76,7 @@ const Header: React.FC = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center h-full">
-            {user ? (
+            {user && variant === 'main' ? (
               <>
                  <NavLink 
                     to="/" 
@@ -188,7 +188,7 @@ const Header: React.FC = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-4">
-             {user && <NotificationBell />}
+             {user && variant === 'main' && <NotificationBell />}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               type="button"
@@ -207,7 +207,7 @@ const Header: React.FC = () => {
       {isMenuOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white absolute w-full shadow-lg z-50" id="mobile-menu">
           <div className="py-2">
-            {user ? (
+            {user && variant === 'main' ? (
               <>
                  <NavLink to="/" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Home</NavLink>
                 

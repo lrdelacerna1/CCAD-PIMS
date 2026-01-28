@@ -1,16 +1,19 @@
 
 // Main data types used throughout the frontend application
 
+export type UserRole = 'student' | 'admin' | 'superadmin' | 'faculty' | 'guest';
+
 export interface User {
     id: string;
     email: string;
     name: string;
-    role: 'student' | 'admin' | 'superadmin' | 'faculty';
+    role: UserRole;
     photoURL?: string;
     // Optional fields based on your user schema
     firstName?: string;
     lastName?: string;
     emailAddress?: string;
+    emailVerified?: boolean;
 }
 
 export interface Area {

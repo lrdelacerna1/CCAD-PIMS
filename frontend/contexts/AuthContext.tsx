@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         id: userDoc.id,
                         ...userData,
                         emailVerified: firebaseUser.emailVerified,
-                    } as User;
+                    } as unknown as User;
                     setUser(userPayload);
                     const userRole = userPayload.role;
                     const isSuperAdminRole = userRole === 'superadmin';
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         lastLogin: new Date().toISOString(),
                     };
                     await setDoc(userDocRef, newUser);
-                    setUser({ id: firebaseUser.uid, ...newUser } as User);
+                    setUser({ id: firebaseUser.uid, ...newUser } as unknown as User);
                     setIsUser(true);
                     setIsAdmin(false);
                     setIsSuperAdmin(false);
@@ -102,6 +102,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const register = async (userData: any) => {
         try {
             await registerUserApi(userData);
+            const firebaseUser = auth.currentUser;
+            if (firebaseUser) {
+                await firebaseSendEmailVerification(firebaseUser);
+            }
         } catch (error) {
             console.error("Registration failed:", error);
             throw error;
@@ -140,7 +144,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         id: userDoc.id,
                         ...userData,
                         emailVerified: reloadedFirebaseUser.emailVerified,
-                    } as User;
+                    } as unknown as User;
                     setUser(userPayload);
                     const userRole = userPayload.role;
                     const isSuperAdminRole = userRole === 'superadmin';

@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { AuthLayout } from '../components/layout/AuthLayout';
 import { MailIcon, LockIcon, UserIcon, GoogleIcon, PhoneIcon, AcademicCapIcon, BriefcaseIcon } from '../components/Icons';
 import { UserRole } from '../types';
+import { Select } from '../components/ui/Select';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +33,11 @@ const RegisterPage: React.FC = () => {
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
+    }
+
+    if ((userType === 'student' || userType === 'faculty') && !email.endsWith('@up.edu.ph')) {
+        setError('Invalid UP Mail address. Please use your @up.edu.ph email.');
+        return;
     }
 
     setError('');
@@ -99,11 +105,46 @@ const RegisterPage: React.FC = () => {
           {userType === 'student' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Student ID" id="studentId" type="text" value={studentId} onChange={e => setStudentId(e.target.value)} required icon={<UserIcon className="w-5 h-5"/>} />
-              <Input label="Program" id="program" type="text" value={program} onChange={e => setProgram(e.target.value)} required icon={<AcademicCapIcon className="w-5 h-5"/>} />
+              <Select
+                label="Program"
+                id="program"
+                value={program}
+                onChange={(e) => setProgram(e.target.value)}
+                required
+                icon={<AcademicCapIcon className="w-5 h-5" />}
+                >
+                <option value="" disabled>Select a program</option>
+                <optgroup label="Arts and Humanities">
+                    <option value="Certificate in Fine Arts (Studio Arts)">Certificate in Fine Arts (Studio Arts)</option>
+                    <option value="Certificate in Fine Arts (Product Design)">Certificate in Fine Arts (Product Design)</option>
+                    <option value="Bachelor of Fine Arts (Studio Arts)">Bachelor of Fine Arts (Studio Arts)</option>
+                    <option value="Bachelor of Fine Arts (Product Design)">Bachelor of Fine Arts (Product Design)</option>
+                    <option value="Bachelor of Arts (Mass Communication)">Bachelor of Arts (Mass Communication)</option>
+                </optgroup>
+                <optgroup label="Business Management">
+                    <option value="Master of Business Administration">Master of Business Administration</option>
+                    <option value="Bachelor of Science in Management">Bachelor of Science in Management</option>
+                </optgroup>
+                <optgroup label="Sciences">
+                    <option value="Master of Science in Computer Science">Master of Science in Computer Science</option>
+                    <option value="Master of Science in Environmental Studies">Master of Science in Environmental Studies</option>
+                    <option value="Bachelor of Science in Biology">Bachelor of Science in Biology</option>
+                    <option value="Bachelor of Science in Computer Science">Bachelor of Science in Computer Science</option>
+                    <option value="Bachelor of Science in Mathematics">Bachelor of Science in Mathematics</option>
+                </optgroup>
+                <optgroup label="Social Sciences">
+                    <option value="Master of Education">Master of Education</option>
+                    <option value="Bachelor of Arts in Political Science">Bachelor of Arts in Political Science</option>
+                    <option value="Bachelor of Arts in Psychology">Bachelor of Arts in Psychology</option>
+                </optgroup>
+                <optgroup label="High School">
+                    <option value="High School">High School</option>
+                </optgroup>
+            </Select>
             </div>
           )}
 
-          <Input label="Contact Number" id="contactNumber" type="tel" value={contactNumber} onChange={e => setContactNumber(e.target.value)} icon={<PhoneIcon className="w-5 h-5"/>} />
+          <Input label="Contact Number" id="contactNumber" type="tel" value={contactNumber} onChange={e => setContactNumber(e.target.value)} icon={<PhoneIcon className="w-5 h-5"/>} pattern="[0-9]*" title="Please enter numbers only" />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Password" id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required icon={<LockIcon className="w-5 h-5"/>} />
