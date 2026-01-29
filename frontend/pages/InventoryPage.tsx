@@ -1,17 +1,39 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import EquipmentManagement from '../components/inventory/EquipmentManagement';
 import RoomManagement from '../components/inventory/RoomManagement';
 import { getAreasApi } from '../../backend/api/areas';
+import { useAuth } from '../hooks/useAuth';
 import { Area } from '../types';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { SearchIcon } from '../components/Icons';
 
 const InventoryPage: React.FC = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'equipment' | 'rooms'>('equipment');
     const [searchQuery, setSearchQuery] = useState('');
-    const [areaFilter, setAreaFilter] = useState('all');
     const [areas, setAreas] = useState<Area[]>([]);
+    
+    // Determine the areas the user can manage
+    const manageableAreas = useMemo(() => {
+        if (!user) return [];
+        if (user.role === 'superadmin') return areas;
+        return areas.filter(area => user.managedAreaIds?.includes(area.id));
+    }, [areas, user]);
+
+    // Set the initial state of the area filter
+    const [areaFilter, setAreaFilter] = useState('all');
+
+    useEffect(() => {
+        // Default to the first managed area if the user is an admin and manages only one
+        if (user?.role === 'admin' && manageableAreas.length === 1) {
+            setAreaFilter(manageableAreas[0].id);
+        } else {
+            setAreaFilter('all');
+        }
+    }, [user, manageableAreas]);
+
 
     useEffect(() => {
         const fetchAreas = async () => {
@@ -28,18 +50,24 @@ const InventoryPage: React.FC = () => {
     // Reset filters when switching tabs
     useEffect(() => {
         setSearchQuery('');
-        setAreaFilter('all');
-    }, [activeTab]);
+        if (user?.role === 'admin' && manageableAreas.length === 1) {
+            setAreaFilter(manageableAreas[0].id);
+        } else {
+            setAreaFilter('all');
+        }
+    }, [activeTab, user, manageableAreas]);
 
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
 
     const areaFilterOptions = useMemo(() => {
-        return [
-            { value: 'all', label: 'All Areas' },
-            ...areas.map(a => ({ value: a.id, label: a.name }))
-        ];
-    }, [areas]);
+        const options = manageableAreas.map(a => ({ value: a.id, label: a.name }));
+        // Only show "All Areas" if the user can see more than one area
+        if (user?.role === 'superadmin' || manageableAreas.length > 1) {
+            return [{ value: 'all', label: 'All Areas' }, ...options];
+        }
+        return options;
+    }, [manageableAreas, user]);
 
     return (
         <div className="container mx-auto p-6">
@@ -56,14 +84,17 @@ const InventoryPage: React.FC = () => {
                             icon={<SearchIcon className="w-5 h-5" />}
                         />
                     </div>
-                    <div className="w-full sm:w-48">
-                        <Select
-                            id="area-filter-inventory"
-                            value={areaFilter}
-                            onChange={(e) => setAreaFilter(e.target.value)}
-                            options={areaFilterOptions}
-                        />
-                    </div>
+                    {/* Only show the filter if there are options to choose from */}
+                    {areaFilterOptions.length > 1 && (
+                         <div className="w-full sm:w-48">
+                            <Select
+                                id="area-filter-inventory"
+                                value={areaFilter}
+                                onChange={(e) => setAreaFilter(e.target.value)}
+                                options={areaFilterOptions}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             
