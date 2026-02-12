@@ -59,82 +59,109 @@ export class CalendarService {
 
         for (const day of days) {
             let totalResources = 0;
-            let bookedResources = 0;
-
-            const dayStart = new Date(day);
-            const dayEnd = new Date(day);
-            dayEnd.setDate(dayEnd.getDate() + 1);
+            let unavailableResources = 0; // Includes booked, maintenance, blocked
 
             if (resourceType === 'equipment') {
-                // Total Equipment
-                let itemQuery = areaId === 'all' ? query(inventoryItemsCollection) : query(inventoryItemsCollection, where('areaId', '==', areaId));
+                const itemQuery = areaId === 'all' 
+                    ? query(inventoryItemsCollection) 
+                    : query(inventoryItemsCollection, where('areaId', '==', areaId));
                 const itemsSnapshot = await getDocs(itemQuery);
                 const itemIds = itemsSnapshot.docs.map(doc => doc.id);
                 
                 if (itemIds.length > 0) {
-                    const instancesQuery = query(inventoryInstancesCollection, where('itemId', 'in', itemIds), where('condition', '!=', 'Lost/Unusable'));
+                    const instancesQuery = query(inventoryInstancesCollection, where('itemId', 'in', itemIds));
                     const instancesSnapshot = await getDocs(instancesQuery);
-                    totalResources = instancesSnapshot.size;
-                }
+                    const allInstances = instancesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as InventoryInstance[];
+                    
+                    totalResources = allInstances.length;
 
-                // Booked Equipment
-                const requestsQuery = query(equipmentRequestsCollection,
-                    where('requestedStartDate', '<=', day),
-                    where('requestedEndDate', '>=', day),
-                    where('status', 'in', ['Ready for Pickup', 'Closed']),
-                );
-                const requestsSnapshot = await getDocs(requestsQuery);
+                    const requestsQuery = query(equipmentRequestsCollection,
+                        where('requestedStartDate', '<=', day),
+                        where('requestedEndDate', '>=', day),
+                        where('status', 'in', ['Approved', 'Ready for Pickup', 'In Use', 'Overdue'])
+                    );
+                    const requestsSnapshot = await getDocs(requestsQuery);
+                    const todaysReservations = requestsSnapshot.docs.map(d => d.data() as EquipmentRequest);
 
-                let relevantRequestCount = 0;
-                for (const requestDoc of requestsSnapshot.docs) {
-                    const requestData = requestDoc.data() as EquipmentRequest;
-                    if (areaId === 'all') {
-                        relevantRequestCount += requestData.requestedItems.length;
-                    } else {
-                        for (const item of requestData.requestedItems) {
-                            const itemDoc = await getDoc(doc(db, "inventoryItems", item.itemId));
-                            if (itemDoc.exists() && (itemDoc.data() as InventoryItem).areaId === areaId) {
-                                relevantRequestCount++;
-                            }
+                    const unavailableInstanceIds = new Set<string>();
+
+                    allInstances.forEach(instance => {
+                        // Check for Under Maintenance status
+                        if (instance.status === 'Under Maintenance') {
+                            unavailableInstanceIds.add(instance.id);
+                            return; // No need for further checks
                         }
-                    }
+
+                        // Check for manually blocked dates
+                        if (instance.blockedDates?.includes(day)) {
+                            unavailableInstanceIds.add(instance.id);
+                            return;
+                        }
+
+                        // Check for active reservations
+                        const isReserved = todaysReservations.some(req => 
+                            req.assignedItems?.some(asgn => asgn.instanceId === instance.id)
+                        );
+                        if (isReserved) {
+                            unavailableInstanceIds.add(instance.id);
+                        }
+                    });
+
+                    unavailableResources = unavailableInstanceIds.size;
                 }
-                bookedResources = relevantRequestCount;
 
             } else { // rooms
-                // Total Rooms
-                let typeQuery = areaId === 'all' ? query(roomTypesCollection) : query(roomTypesCollection, where('areaId', '==', areaId));
+                const typeQuery = areaId === 'all' 
+                    ? query(roomTypesCollection) 
+                    : query(roomTypesCollection, where('areaId', '==', areaId));
                 const typesSnapshot = await getDocs(typeQuery);
                 const typeIds = typesSnapshot.docs.map(doc => doc.id);
 
                 if (typeIds.length > 0) {
                     const instancesQuery = query(roomInstancesCollection, where('roomTypeId', 'in', typeIds));
                     const instancesSnapshot = await getDocs(instancesQuery);
-                    totalResources = instancesSnapshot.size;
-                }
-                
-                // Booked Rooms
-                const requestsQuery = query(roomRequestsCollection, 
-                    where('requestedStartDate', '==', day),
-                    where('status', 'in', ['Ready for Check-in', 'Overdue', 'Closed'])
-                );
-                 const requestsSnapshot = await getDocs(requestsQuery);
+                    const allInstances = instancesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as RoomInstance[];
 
-                let relevantRequestCount = 0;
-                for (const requestDoc of requestsSnapshot.docs) {
-                    const requestData = requestDoc.data() as RoomRequest;
-                     if (areaId === 'all' || requestData.requestedRoom.areaId === areaId) {
-                        relevantRequestCount++;
-                    }
+                    totalResources = allInstances.length;
+
+                    const requestsQuery = query(roomRequestsCollection, 
+                        where('requestedStartDate', '<=', day),
+                        where('requestedEndDate', '>=', day),
+                        where('status', 'in', ['Approved', 'Ready for Check-in', 'In Use', 'Overdue'])
+                    );
+                    const requestsSnapshot = await getDocs(requestsQuery);
+                    const todaysReservations = requestsSnapshot.docs.map(d => d.data() as RoomRequest);
+
+                    const unavailableInstanceIds = new Set<string>();
+
+                    allInstances.forEach(instance => {
+                        // Check for Under Maintenance status
+                        if (instance.status === 'Under Maintenance') {
+                            unavailableInstanceIds.add(instance.id);
+                            return; 
+                        }
+
+                        // Check for manually blocked dates
+                        if (instance.blockedDates?.includes(day)) {
+                            unavailableInstanceIds.add(instance.id);
+                            return;
+                        }
+
+                        // Check for active reservations
+                        const isReserved = todaysReservations.some(req => req.instanceId === instance.id);
+                        if (isReserved) {
+                            unavailableInstanceIds.add(instance.id);
+                        }
+                    });
+                    unavailableResources = unavailableInstanceIds.size;
                 }
-                bookedResources = relevantRequestCount;
             }
             
             dailyAvailabilities.push({
                 date: day,
-                level: this.calculateAvailabilityLevel(totalResources, bookedResources),
+                level: this.calculateAvailabilityLevel(totalResources, unavailableResources),
                 total: totalResources,
-                booked: bookedResources
+                booked: unavailableResources // Field name is now a bit of a misnomer, but changing it would break the frontend contract.
             });
         }
 

@@ -10,8 +10,6 @@ const ProfilePage: React.FC = () => {
   const { user, signOut, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
     contactNumber: '',
     idNumber: '',
   });
@@ -22,8 +20,6 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (user) {
       setFormData({
-        firstName: user.firstName,
-        lastName: user.lastName,
         contactNumber: user.contactNumber || '',
         idNumber: user.idNumber || '',
       });
@@ -54,8 +50,6 @@ const ProfilePage: React.FC = () => {
     setIsEditing(false);
     if (user) {
       setFormData({
-        firstName: user.firstName,
-        lastName: user.lastName,
         contactNumber: user.contactNumber || '',
         idNumber: user.idNumber || '',
       });
@@ -128,9 +122,13 @@ const ProfilePage: React.FC = () => {
                     <div className="space-y-6">
                         {isEditing ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input label="First Name" id="firstName" name="firstName" value={formData.firstName} onChange={handleInputChange} />
-                                <Input label="Last Name" id="lastName" name="lastName" value={formData.lastName} onChange={handleInputChange} />
+                                <div className="md:col-span-2">
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Full Name</p>
+                                    <p className="text-slate-900 dark:text-white font-medium text-lg">{user.firstName} {user.lastName}</p>
+                                </div>
+                                {user.role !== 'guest' && (
                                 <Input label="ID Number" id="idNumber" name="idNumber" value={formData.idNumber} onChange={handleInputChange} icon={<IdentificationIcon className="w-5 h-5"/>} />
+                                )}
                                 <Input label="Contact Number" id="contactNumber" name="contactNumber" value={formData.contactNumber} onChange={handleInputChange} icon={<PhoneIcon className="w-5 h-5"/>} />
                             </div>
                         ) : (
@@ -139,6 +137,7 @@ const ProfilePage: React.FC = () => {
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Full Name</p>
                                     <p className="text-slate-900 dark:text-white font-medium text-lg">{user.firstName} {user.lastName}</p>
                                 </div>
+                                {user.role !== 'guest' && (
                                 <div>
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">ID Number</p>
                                     <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">
@@ -146,6 +145,7 @@ const ProfilePage: React.FC = () => {
                                         {user.idNumber || 'Not provided'}
                                     </div>
                                 </div>
+                                )}
                                 <div className="md:col-span-2">
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Email Address</p>
                                     <div className="flex items-center gap-2 text-slate-900 dark:text-white font-medium">

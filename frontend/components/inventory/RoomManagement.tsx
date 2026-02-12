@@ -9,16 +9,17 @@ import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
-import { SearchIcon, BuildingOfficeIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, EllipsisVerticalIcon, PencilIcon, EyeSlashIcon, EyeIcon, TrashIcon, XIcon, PhotoIcon, TagIcon } from '../Icons';
+import { SearchIcon, BuildingOfficeIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, EllipsisVerticalIcon, PencilIcon, EyeSlashIcon, EyeIcon, TrashIcon, XIcon, PhotoIcon, TagIcon, ClockIcon } from '../Icons';
 import { Textarea } from '../ui/Textarea';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, isWithinInterval } from 'date-fns';
+import RequestHistory from './RequestHistory';
 
 const RoomStatusBadge: React.FC<{ status: RoomStatus }> = ({ status }) => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full capitalize";
     const statusClasses: { [key in RoomStatus]: string } = {
-        'Available': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-        'In Use': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-        'Under Maintenance': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+        'Available': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+        'Reserved': 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+        'Under Maintenance': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
     };
     return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
@@ -237,11 +238,9 @@ const AddRoomInstanceModal: React.FC<{
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
         condition: initialData?.condition || 'Good' as RoomCondition,
-        status: initialData?.status || 'Available' as RoomStatus,
         notes: initialData?.notes || '',
         capacity: initialData?.capacity || '',
         features: initialData?.features?.join(', ') || '',
-        lastCleanedDate: initialData?.lastCleanedDate || '',
     });
     
     const [isLoading, setIsLoading] = useState(false);
@@ -261,7 +260,7 @@ const AddRoomInstanceModal: React.FC<{
         setIsLoading(true);
         setError('');
         try {
-            const payload: Omit<RoomInstance, 'id' | 'roomTypeId'> = {
+            const payload: Omit<RoomInstance, 'id' | 'roomTypeId' | 'status'> = {
                 ...formData,
                 name: formData.name.trim(),
                 capacity: Number(formData.capacity) || undefined,
@@ -269,10 +268,12 @@ const AddRoomInstanceModal: React.FC<{
             };
 
             if (initialData) {
-                await updateRoomInstanceApi(initialData.id, payload);
+                // When editing, status is managed in the details modal
+                await updateRoomInstanceApi(initialData.id, payload as any);
             } else {
                 await createRoomInstanceApi({
                     roomTypeId: roomType.id,
+                    status: 'Available',
                     ...payload,
                     photoUrls: [], // Photos managed in details modal
                 });
@@ -300,13 +301,9 @@ const AddRoomInstanceModal: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
                         <div className="space-y-4">
                             <Input label="Room Name / Identifier" name="name" id="instance-name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Conference Room A" required />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Newly Renovated', 'Good', 'Fair', 'Poor'].map(c => ({ value: c, label: c }))} />
-                                <Select label="Status" id="status" name="status" value={formData.status} onChange={handleInputChange} options={['Available', 'In Use', 'Under Maintenance'].map(s => ({ value: s, label: s }))} />
-                            </div>
+                            <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Newly Renovated', 'Good', 'Fair', 'Poor'].map(c => ({ value: c, label: c }))} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Capacity (Optional)" name="capacity" id="capacity" type="number" value={formData.capacity} onChange={handleInputChange} placeholder="e.g., 12" />
-                                <Input label="Last Cleaned (Optional)" name="lastCleanedDate" id="lastCleanedDate" type="date" value={formData.lastCleanedDate} onChange={handleInputChange} />
                             </div>
                             <Input label="Features (comma-separated)" name="features" id="features" value={formData.features} onChange={handleInputChange} placeholder="e.g., Whiteboard, Projector" />
                             <Textarea label="Notes (Optional)" id="notes" name="notes" value={formData.notes} onChange={handleInputChange} />
@@ -323,21 +320,22 @@ const AddRoomInstanceModal: React.FC<{
 };
 
 const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName: string; onClose: () => void; onUpdate: () => void; }> = ({ instance, roomTypeName, onClose, onUpdate }) => {
-    const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'calendar'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'calendar' | 'history'>('details');
     
-    // State for editing details
     const [editedInstance, setEditedInstance] = useState(instance);
     const [newPhotoUrl, setNewPhotoUrl] = useState('');
     const [newFeature, setNewFeature] = useState('');
 
-    // State for calendar
     const [currentDate, setCurrentDate] = useState(new Date());
     const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
     const [isCalendarLoading, setIsCalendarLoading] = useState(true);
     const [localBlockedDates, setLocalBlockedDates] = useState<Set<string>>(new Set(instance.blockedDates || []));
     const [isSaving, setIsSaving] = useState(false);
-    
-    const hasChanges = useMemo(() => JSON.stringify(instance) !== JSON.stringify(editedInstance) || JSON.stringify(instance.blockedDates || []) !== JSON.stringify(Array.from(localBlockedDates)), [instance, editedInstance, localBlockedDates]);
+
+    const hasChanges = useMemo(() => 
+        JSON.stringify(instance) !== JSON.stringify(editedInstance) || 
+        JSON.stringify(new Set(instance.blockedDates || [])) !== JSON.stringify(localBlockedDates),
+    [instance, editedInstance, localBlockedDates]);
 
     useEffect(() => {
         setEditedInstance(instance);
@@ -345,27 +343,31 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
     }, [instance]);
 
     useEffect(() => {
-        if (activeTab !== 'calendar') return;
-        const fetchReservations = async () => {
-            setIsCalendarLoading(true);
-            try {
-                const allRequests: RoomRequest[] = await getAllRoomRequestsApi();
-                const instanceRequests = allRequests.filter(req => req.instanceId === instance.id && ['Ready for Check-in', 'Overdue'].includes(req.status));
-                const booked = new Set<string>();
-                instanceRequests.forEach(req => {
-                    const start = new Date(req.requestedStartDate + 'T00:00:00Z');
-                    const end = new Date(req.requestedEndDate + 'T00:00:00Z');
-                    const interval = eachDayOfInterval({ start, end });
-                    interval.forEach(day => booked.add(format(day, 'yyyy-MM-dd')));
-                });
-                setBookedDates(booked);
-            } catch (error) {
-                console.error("Failed to fetch reservations for room instance calendar", error);
-            } finally {
-                setIsCalendarLoading(false);
-            }
-        };
-        fetchReservations();
+        if (activeTab === 'calendar') {
+            const fetchReservations = async () => {
+                setIsCalendarLoading(true);
+                try {
+                    const allRequests: RoomRequest[] = await getAllRoomRequestsApi();
+                    const instanceRequests = allRequests.filter(req => 
+                        req.instanceId === instance.id && 
+                        ['Approved', 'Ready for Check-in', 'In Use', 'Overdue'].includes(req.status)
+                    );
+                    const booked = new Set<string>();
+                    instanceRequests.forEach(req => {
+                        const start = new Date(req.requestedStartDate);
+                        const end = new Date(req.requestedEndDate);
+                        const interval = eachDayOfInterval({ start, end });
+                        interval.forEach(day => booked.add(format(day, 'yyyy-MM-dd')));
+                    });
+                    setBookedDates(booked);
+                } catch (error) {
+                    console.error("Failed to fetch reservations for room instance calendar", error);
+                } finally {
+                    setIsCalendarLoading(false);
+                }
+            };
+            fetchReservations();
+        }
     }, [instance.id, activeTab]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -392,8 +394,10 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
     const handleSaveChanges = async () => {
         setIsSaving(true);
         try {
-            await updateRoomInstanceApi(instance.id, { ...editedInstance, blockedDates: Array.from(localBlockedDates) });
+            const { status, ...payloadToUpdate } = editedInstance;
+            await updateRoomInstanceApi(instance.id, { ...payloadToUpdate, blockedDates: Array.from(localBlockedDates) });
             onUpdate();
+            onClose();
         } catch (error) {
             console.error("Failed to save changes", error);
         } finally {
@@ -412,7 +416,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
         });
     };
 
-    const renderCalendar = () => { /* ... calendar rendering logic ... */
+    const renderCalendar = () => {
         const monthStart = startOfMonth(currentDate);
         const allDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(endOfMonth(monthStart)) });
         return allDays.map(day => {
@@ -445,6 +449,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
                             <button onClick={() => setActiveTab('details')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'details' ? activeTabClasses : inactiveTabClasses}`}>Details</button>
                             <button onClick={() => setActiveTab('photos')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'photos' ? activeTabClasses : inactiveTabClasses}`}>Photos</button>
                             <button onClick={() => setActiveTab('calendar')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'calendar' ? activeTabClasses : inactiveTabClasses}`}>Calendar</button>
+                            <button onClick={() => setActiveTab('history')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? activeTabClasses : inactiveTabClasses}`}>History</button>
                         </nav>
                     </div>
                 </div>
@@ -454,11 +459,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Select label="Condition" name="condition" id="room-condition" value={editedInstance.condition} onChange={handleInputChange} options={['Newly Renovated', 'Good', 'Fair', 'Poor'].map(c => ({ value: c, label: c }))} />
-                                <Select label="Status" name="status" id="room-status" value={editedInstance.status} onChange={handleInputChange} options={['Available', 'In Use', 'Under Maintenance'].map(s => ({ value: s, label: s }))} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Capacity" name="capacity" id="capacity" type="number" value={editedInstance.capacity || ''} onChange={handleInputChange} placeholder="e.g., 12" />
-                                <Input label="Last Cleaned Date" name="lastCleanedDate" id="lastCleanedDate" type="date" value={editedInstance.lastCleanedDate || ''} onChange={handleInputChange} />
                             </div>
                             <div>
                                 <label className="block mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Features</label>
@@ -508,7 +509,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
                     )}
                     {activeTab === 'calendar' && (
                         <div>
-                             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Click dates to manually block them. Dates with reservations cannot be changed.</p>
+                             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Click dates to manually block them for maintenance. Dates with reservations cannot be changed.</p>
                             {isCalendarLoading ? <p className="text-center">Loading calendar...</p> : (
                                 <>
                                     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mb-4 text-xs">
@@ -531,6 +532,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
                             )}
                         </div>
                     )}
+                    {activeTab === 'history' && <RequestHistory instanceId={instance.id} />}
                 </div>
 
                  <div className="p-4 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 mt-auto rounded-b-lg">
@@ -542,7 +544,6 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
     );
 };
 
-// ... Rest of the file
 const RoomInstanceActionMenu: React.FC<{
     instance: RoomInstance;
     onEdit: (instance: RoomInstance) => void;
@@ -597,11 +598,12 @@ const RoomInstanceActionMenu: React.FC<{
 
 const RoomInstanceManager: React.FC<{ 
     roomType: RoomTypeWithQuantity; 
+    allRoomRequests: RoomRequest[];
     onInstanceClick: (instance: RoomInstance) => void; 
     onAddInstance: (roomType: RoomTypeWithQuantity) => void;
     onEditInstance: (instance: RoomInstance) => void;
     onDeleteInstance: (instance: RoomInstance) => void;
-}> = ({ roomType, onInstanceClick, onAddInstance, onEditInstance, onDeleteInstance }) => {
+}> = ({ roomType, allRoomRequests, onInstanceClick, onAddInstance, onEditInstance, onDeleteInstance }) => {
     const [instances, setInstances] = useState<RoomInstance[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -619,6 +621,31 @@ const RoomInstanceManager: React.FC<{
         };
         fetchInstances();
     }, [roomType.id, roomType.name, roomType.quantity.total]);
+
+    const getTodayStatus = useCallback((instance: RoomInstance): RoomStatus => {
+        const today = startOfDay(new Date()); // Use start of day for consistent comparison
+        
+        if (instance.status === 'Under Maintenance') {
+            return 'Under Maintenance';
+        }
+
+        const isReservedToday = allRoomRequests.some(req => {
+            if (req.instanceId !== instance.id) return false;
+
+            const isActiveRequest = ['Approved', 'Ready for Check-in', 'In Use', 'Overdue'].includes(req.status);
+            if (!isActiveRequest) return false;
+
+            const reservationStart = startOfDay(new Date(req.requestedStartDate));
+            const reservationEnd = endOfDay(new Date(req.requestedEndDate));
+            return isWithinInterval(today, { start: reservationStart, end: reservationEnd });
+        });
+
+        if (isReservedToday) {
+            return 'Reserved';
+        }
+
+        return 'Available';
+    }, [allRoomRequests]);
 
     return (
         <div className="p-4 bg-gray-50 dark:bg-gray-700/50">
@@ -649,7 +676,7 @@ const RoomInstanceManager: React.FC<{
                                 >
                                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{inst.name}</td>
                                     <td className="px-4 py-3"><RoomConditionBadge condition={inst.condition} /></td>
-                                    <td className="px-4 py-3"><RoomStatusBadge status={inst.status} /></td>
+                                    <td className="px-4 py-3"><RoomStatusBadge status={getTodayStatus(inst)} /></td>
                                     <td className="px-4 py-3 text-right">
                                         <RoomInstanceActionMenu 
                                             instance={inst} 
@@ -676,7 +703,6 @@ const RoomAvailabilityCheckModal: React.FC<{
     areas: Area[];
     onClose: () => void;
 }> = ({ roomTypes, areas, onClose }) => {
-    // ... Implementation is unchanged as it was not part of the user request.
     const today = new Date().toISOString().split('T')[0];
     const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(today);
@@ -799,7 +825,6 @@ const RoomActionMenu: React.FC<{
     onHide: (roomType: RoomTypeWithQuantity) => void;
     onDelete: (roomType: RoomTypeWithQuantity) => void;
 }> = ({ roomType, onEdit, onHide, onDelete }) => {
-    // ... existing implementation ...
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -862,6 +887,7 @@ interface RoomManagementProps {
 const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter }) => {
     const { user } = useAuth();
     const [roomTypes, setRoomTypes] = useState<RoomTypeWithQuantity[]>([]);
+    const [allRoomRequests, setAllRoomRequests] = useState<RoomRequest[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -872,14 +898,12 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter
     const [viewingInstance, setViewingInstance] = useState<RoomInstance | null>(null);
     const [parentRoomType, setParentRoomType] = useState<RoomTypeWithQuantity | null>(null);
     
-    // Manage Room Type Modals
     const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false);
     const [isAddInstanceModalOpen, setIsAddInstanceModalOpen] = useState(false);
     const [roomTypeForNewInstance, setRoomTypeForNewInstance] = useState<RoomTypeWithQuantity | null>(null);
     const [roomTypeToEdit, setRoomTypeToEdit] = useState<RoomTypeWithQuantity | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<RoomTypeWithQuantity | null>(null);
     
-    // Manage Instance Modals
     const [instanceToEdit, setInstanceToEdit] = useState<RoomInstance | null>(null);
     const [showDeleteInstanceConfirm, setShowDeleteInstanceConfirm] = useState<RoomInstance | null>(null);
 
@@ -889,9 +913,14 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter
         setIsLoading(true);
         setError('');
         try {
-            const [typesData, areasData] = await Promise.all([getRoomTypesApi(), getAreasApi()]);
+            const [typesData, areasData, requestsData] = await Promise.all([
+                getRoomTypesApi(), 
+                getAreasApi(),
+                getAllRoomRequestsApi()
+            ]);
             setRoomTypes(typesData);
             setAreas(areasData);
+            setAllRoomRequests(requestsData);
         } catch (err) {
             setError('Failed to load room data.');
         } finally {
@@ -936,7 +965,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter
         } else {
             const roomTypeWithQuantity: RoomTypeWithQuantity = {
                 ...newRoomType,
-                quantity: { total: 0, available: 0, inUse: 0, underMaintenance: 0 }
+                quantity: { total: 0, available: 0, reserved: 0, underMaintenance: 0 }
             };
             setRoomTypeForNewInstance(roomTypeWithQuantity);
             setIsAddInstanceModalOpen(true);
@@ -1016,7 +1045,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter
                     </div>
                     <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 text-center">
                          <div className="min-w-[50px]"><p className="font-semibold text-lg dark:text-white">{rt.quantity.available}</p><p className="text-xs dark:text-gray-400">Available</p></div>
-                         <div className="min-w-[50px]"><p className="font-semibold text-lg dark:text-white">{rt.quantity.inUse}</p><p className="text-xs dark:text-gray-400">In Use</p></div>
+                         <div className="min-w-[50px]"><p className="font-semibold text-lg dark:text-white">{rt.quantity.reserved}</p><p className="text-xs dark:text-gray-400">Reserved</p></div>
                          <div className="min-w-[50px]"><p className="font-semibold text-lg dark:text-white">{rt.quantity.total}</p><p className="text-xs dark:text-gray-400">Total</p></div>
                          <div className="border-l pl-4 ml-2 dark:border-slate-700">
                             <RoomActionMenu 
@@ -1032,6 +1061,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ searchQuery, areaFilter
             {expandedRoomTypeId === rt.id && (
                 <RoomInstanceManager 
                     roomType={rt} 
+                    allRoomRequests={allRoomRequests}
                     onInstanceClick={(instance) => handleViewInstance(instance, rt)} 
                     onAddInstance={handleOpenAddInstanceModal} 
                     onEditInstance={handleEditInstance}

@@ -2,20 +2,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Area, InventoryItemWithQuantity, InventoryInstance, InventoryInstanceCondition, InventoryInstanceStatus, EquipmentRequest, InventoryItem } from '../../types';
-// FIX: Import 'checkAvailabilityApi' to be used in the AvailabilityCheckModal.
 import { getInventoryApi, getInstancesByItemIdApi, createInventoryItemApi, createInstanceApi, updateInventoryItemApi, deleteInventoryItemApi, updateInstanceApi, deleteInstanceApi, checkAvailabilityApi } from '../../../backend/api/inventory';
 import { getAreasApi } from '../../../backend/api/areas';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
-// FIX: Import 'SearchIcon' to be used in the AvailabilityCheckModal.
-import { InventoryIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, EllipsisVerticalIcon, PencilIcon, EyeSlashIcon, EyeIcon, TrashIcon, PhotoIcon, XIcon, SearchIcon } from '../Icons';
+import { InventoryIcon, ChevronUpIcon, ChevronDownIcon, PlusIcon, EllipsisVerticalIcon, PencilIcon, EyeSlashIcon, EyeIcon, TrashIcon, PhotoIcon, XIcon, SearchIcon, TagIcon } from '../Icons';
 import { Textarea } from '../ui/Textarea';
 import { getAllEquipmentRequestsApi } from '../../../backend/api/equipmentRequests';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, isWithinInterval } from 'date-fns';
 import RequestHistory from './RequestHistory';
-
 
 const StatusBadge: React.FC<{ status: InventoryInstanceStatus }> = ({ status }) => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full capitalize";
@@ -57,11 +54,8 @@ const AddItemModal: React.FC<{
             setPhotoFile(file);
             setPhotoUrl(''); // Clear URL when file is selected
             
-            // Create preview
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setPhotoPreview(reader.result as string);
-            };
+            reader.onloadend = () => setPhotoPreview(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
@@ -90,7 +84,6 @@ const AddItemModal: React.FC<{
         try {
             let finalPhotoUrl = photoUrl.trim();
             
-            // If a file was uploaded, convert to base64
             if (photoFile) {
                 const reader = new FileReader();
                 finalPhotoUrl = await new Promise((resolve, reject) => {
@@ -152,78 +145,29 @@ const AddItemModal: React.FC<{
                                 required
                             />
                             
-                            {/* Photo Upload Section */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    <PhotoIcon className="w-4 h-4 inline mr-2" />
-                                    Equipment Photo (Optional)
-                                </label>
-                                
-                                {/* Photo Preview */}
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"><PhotoIcon className="w-4 h-4 inline mr-2" />Equipment Photo (Optional)</label>
                                 {photoPreview && (
                                     <div className="mb-3 relative">
-                                        <img 
-                                            src={photoPreview} 
-                                            alt="Preview" 
-                                            className="w-full h-32 object-cover rounded-lg border border-slate-300 dark:border-slate-600"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleRemovePhoto}
-                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                        >
-                                            <XIcon className="w-4 h-4" />
-                                        </button>
+                                        <img src={photoPreview} alt="Preview" className="w-full h-32 object-cover rounded-lg border border-slate-300 dark:border-slate-600" />
+                                        <button type="button" onClick={handleRemovePhoto} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"><XIcon className="w-4 h-4" /></button>
                                     </div>
                                 )}
-                                
-                                {/* File Upload */}
                                 <div className="mb-2">
-                                    <label 
-                                        htmlFor="photo-file" 
-                                        className="flex items-center justify-center w-full px-4 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer hover:border-sky-500 dark:hover:border-sky-500 transition-colors"
-                                    >
+                                    <label htmlFor="photo-file" className="flex items-center justify-center w-full px-4 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer hover:border-sky-500 dark:hover:border-sky-500 transition-colors">
                                         <PhotoIcon className="w-5 h-5 mr-2 text-slate-500" />
-                                        <span className="text-sm text-slate-600 dark:text-slate-400">
-                                            {photoFile ? photoFile.name : 'Choose a file or drag here'}
-                                        </span>
+                                        <span className="text-sm text-slate-600 dark:text-slate-400">{photoFile ? photoFile.name : 'Choose a file or drag here'}</span>
                                     </label>
-                                    <input
-                                        type="file"
-                                        id="photo-file"
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                        className="hidden"
-                                    />
+                                    <input type="file" id="photo-file" accept="image/*" onChange={handleFileChange} className="hidden" />
                                 </div>
-                                
-                                {/* Divider */}
-                                <div className="relative py-2">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-slate-300 dark:border-slate-600"></div>
-                                    </div>
-                                    <div className="relative flex justify-center">
-                                        <span className="bg-white dark:bg-slate-800 px-2 text-xs text-slate-500">OR</span>
-                                    </div>
-                                </div>
-                                
-                                {/* URL Input */}
-                                <input
-                                    type="url"
-                                    id="item-photo-url"
-                                    value={photoUrl}
-                                    onChange={handleUrlChange}
-                                    placeholder="Enter image URL"
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
-                                />
+                                <div className="relative py-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-300 dark:border-slate-600"></div></div><div className="relative flex justify-center"><span className="bg-white dark:bg-slate-800 px-2 text-xs text-slate-500">OR</span></div></div>
+                                <input type="url" id="item-photo-url" value={photoUrl} onChange={handleUrlChange} placeholder="Enter image URL" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm" />
                             </div>
                         </div>
                     </div>
                     <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50">
                         <Button type="button" onClick={onClose} className="!w-auto" variant="secondary">Cancel</Button>
-                        <Button type="submit" isLoading={isLoading} className="!w-auto">
-                            {initialData ? 'Save Changes' : 'Proceed'}
-                        </Button>
+                        <Button type="submit" isLoading={isLoading} className="!w-auto">{initialData ? 'Save Changes' : 'Proceed'}</Button>
                     </div>
                 </form>
             </div>
@@ -240,12 +184,10 @@ const AddInstanceModal: React.FC<{
     const [formData, setFormData] = useState({
         serialNumber: initialData?.serialNumber || '',
         condition: initialData?.condition || 'Good' as InventoryInstanceCondition,
-        status: initialData?.status || 'Available' as InventoryInstanceStatus,
         notes: initialData?.notes || '',
         assetTag: initialData?.assetTag || '',
         purchaseDate: initialData?.purchaseDate || '',
         warrantyEndDate: initialData?.warrantyEndDate || '',
-        lastMaintenanceDate: initialData?.lastMaintenanceDate || '',
     });
     
     const [isLoading, setIsLoading] = useState(false);
@@ -265,7 +207,7 @@ const AddInstanceModal: React.FC<{
         setIsLoading(true);
         setError('');
         try {
-            const payload: Omit<InventoryInstance, 'id' | 'itemId'> = {
+            const payload: Omit<InventoryInstance, 'id' | 'itemId' | 'status' > = {
                 ...formData,
                 serialNumber: formData.serialNumber.trim(),
                 notes: formData.notes.trim(),
@@ -273,12 +215,13 @@ const AddInstanceModal: React.FC<{
             };
 
             if (initialData) {
-                await updateInstanceApi(initialData.id, payload);
+                await updateInstanceApi(initialData.id, payload as any);
             } else {
                 await createInstanceApi({
                     itemId: item.id,
+                    status: 'Available', 
                     ...payload,
-                    photoUrls: [], // Photos are managed in details modal
+                    photoUrls: [], // Photos managed in details modal
                 });
             }
             onSuccess();
@@ -304,16 +247,12 @@ const AddInstanceModal: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
                         <div className="space-y-4">
                             <Input label="Serial Number" id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} required />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
-                                <Select label="Status" id="status" name="status" value={formData.status} onChange={handleInputChange} options={['Available', 'Reserved', 'Under Maintenance'].map(s => ({ value: s, label: s }))} />
-                            </div>
+                            <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
                              <Input label="Asset Tag (Optional)" id="assetTag" name="assetTag" value={formData.assetTag} onChange={handleInputChange} />
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Purchase Date (Optional)" id="purchaseDate" name="purchaseDate" type="date" value={formData.purchaseDate} onChange={handleInputChange} />
                                 <Input label="Warranty End Date (Optional)" id="warrantyEndDate" name="warrantyEndDate" type="date" value={formData.warrantyEndDate} onChange={handleInputChange} />
                             </div>
-                             <Input label="Last Maintenance (Optional)" id="lastMaintenanceDate" name="lastMaintenanceDate" type="date" value={formData.lastMaintenanceDate} onChange={handleInputChange} />
                             <Textarea label="Notes (Optional)" id="notes" name="notes" value={formData.notes} onChange={handleInputChange} />
                         </div>
                     </div>
@@ -330,18 +269,19 @@ const AddInstanceModal: React.FC<{
 const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: InventoryItemWithQuantity; onClose: () => void; onUpdate: () => void; }> = ({ instance, item, onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'calendar' | 'history'>('details');
     
-    // State for editing details
     const [editedInstance, setEditedInstance] = useState(instance);
     const [newPhotoUrl, setNewPhotoUrl] = useState('');
 
-    // State for calendar
     const [currentDate, setCurrentDate] = useState(new Date());
     const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
     const [isCalendarLoading, setIsCalendarLoading] = useState(true);
     const [localBlockedDates, setLocalBlockedDates] = useState<Set<string>>(new Set(instance.blockedDates || []));
     const [isSaving, setIsSaving] = useState(false);
 
-    const hasDetailChanges = useMemo(() => JSON.stringify(instance) !== JSON.stringify(editedInstance), [instance, editedInstance]);
+    const hasChanges = useMemo(() => 
+        JSON.stringify(instance) !== JSON.stringify(editedInstance) ||
+        JSON.stringify(new Set(instance.blockedDates || [])) !== JSON.stringify(localBlockedDates),
+    [instance, editedInstance, localBlockedDates]);
 
     useEffect(() => {
         setEditedInstance(instance);
@@ -355,13 +295,13 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
             try {
                 const allRequests: EquipmentRequest[] = await getAllEquipmentRequestsApi();
                 const instanceRequests = allRequests.filter(req => 
-                    req.requestedItems.some(item => item.instanceId === instance.id) &&
-                    ['Ready for Pickup'].includes(req.status)
+                    req.assignedItems?.some(asgn => asgn.instanceId === instance.id) &&
+                    ['Approved', 'Ready for Pickup', 'In Use', 'Overdue'].includes(req.status)
                 );
                 const booked = new Set<string>();
                 instanceRequests.forEach(req => {
-                    const start = new Date(req.requestedStartDate + 'T00:00:00Z');
-                    const end = new Date(req.requestedEndDate + 'T00:00:00Z');
+                    const start = new Date(req.requestedStartDate);
+                    const end = new Date(req.requestedEndDate);
                     const interval = eachDayOfInterval({ start, end });
                     interval.forEach(day => booked.add(format(day, 'yyyy-MM-dd')));
                 });
@@ -382,26 +322,22 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
 
     const handleAddPhoto = () => {
         if (newPhotoUrl.trim() && !editedInstance.photoUrls?.includes(newPhotoUrl.trim())) {
-            setEditedInstance(prev => ({
-                ...prev,
-                photoUrls: [...(prev.photoUrls || []), newPhotoUrl.trim()]
-            }));
+            setEditedInstance(prev => ({ ...prev, photoUrls: [...(prev.photoUrls || []), newPhotoUrl.trim()] }));
             setNewPhotoUrl('');
         }
     };
     
     const handleRemovePhoto = (urlToRemove: string) => {
-        setEditedInstance(prev => ({
-            ...prev,
-            photoUrls: (prev.photoUrls || []).filter(url => url !== urlToRemove)
-        }));
+        setEditedInstance(prev => ({ ...prev, photoUrls: (prev.photoUrls || []).filter(url => url !== urlToRemove) }));
     };
     
     const handleSaveChanges = async () => {
         setIsSaving(true);
         try {
-            await updateInstanceApi(instance.id, { ...editedInstance, blockedDates: Array.from(localBlockedDates) });
+            const { status, ...payloadToUpdate } = editedInstance;
+            await updateInstanceApi(instance.id, { ...payloadToUpdate, blockedDates: Array.from(localBlockedDates) });
             onUpdate();
+            onClose();
         } catch (error) {
             console.error("Failed to save changes", error);
         } finally {
@@ -420,14 +356,6 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
         });
     };
     
-    const hasCalendarChanges = useMemo(() => {
-        const originalBlocked = new Set(instance.blockedDates || []);
-        if (originalBlocked.size !== localBlockedDates.size) return true;
-        for (const date of Array.from(originalBlocked)) if (!localBlockedDates.has(date)) return true;
-        for (const date of Array.from(localBlockedDates)) if (!originalBlocked.has(date)) return true;
-        return false;
-    }, [localBlockedDates, instance.blockedDates]);
-
     const renderCalendar = () => {
         const monthStart = startOfMonth(currentDate);
         const allDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(endOfMonth(monthStart)) });
@@ -473,25 +401,19 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                     {activeTab === 'details' && (
                         <div className="space-y-4">
                             <Input label="Serial Number" id="serialNumber" name="serialNumber" value={editedInstance.serialNumber} onChange={handleInputChange} required />
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Select label="Condition" id="condition" name="condition" value={editedInstance.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
-                                <Select label="Status" id="status" name="status" value={editedInstance.status} onChange={handleInputChange} options={['Available', 'Reserved', 'Under Maintenance'].map(s => ({ value: s, label: s }))} />
-                            </div>
-                             <Input label="Asset Tag" id="assetTag" name="assetTag" value={editedInstance.assetTag || ''} onChange={handleInputChange} />
+                            <Select label="Condition" id="condition" name="condition" value={editedInstance.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
+                            <Input label="Asset Tag" id="assetTag" name="assetTag" value={editedInstance.assetTag || ''} onChange={handleInputChange} />
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Purchase Date" id="purchaseDate" name="purchaseDate" type="date" value={editedInstance.purchaseDate || ''} onChange={handleInputChange} />
                                 <Input label="Warranty End Date" id="warrantyEndDate" name="warrantyEndDate" type="date" value={editedInstance.warrantyEndDate || ''} onChange={handleInputChange} />
                             </div>
-                             <Input label="Last Maintenance" id="lastMaintenanceDate" name="lastMaintenanceDate" type="date" value={editedInstance.lastMaintenanceDate || ''} onChange={handleInputChange} />
                             <Textarea label="Notes" id="notes" name="notes" value={editedInstance.notes || ''} onChange={handleInputChange} />
                         </div>
                     )}
                     {activeTab === 'photos' && (
                         <div className="space-y-4">
                             <div className="flex items-end gap-2">
-                                <div className="flex-grow">
-                                    <Input label="Add New Photo URL" id="new-photo-url" value={newPhotoUrl} onChange={e => setNewPhotoUrl(e.target.value)} icon={<PhotoIcon className="w-5 h-5"/>}/>
-                                </div>
+                                <div className="flex-grow"><Input label="Add New Photo URL" id="new-photo-url" value={newPhotoUrl} onChange={e => setNewPhotoUrl(e.target.value)} icon={<PhotoIcon className="w-5 h-5"/>}/></div>
                                 <Button type="button" onClick={handleAddPhoto} disabled={!newPhotoUrl.trim()} className="!w-auto">Add</Button>
                             </div>
                             {(editedInstance.photoUrls && editedInstance.photoUrls.length > 0) ? (
@@ -499,9 +421,7 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                                     {editedInstance.photoUrls.map(url => (
                                         <div key={url} className="relative group">
                                             <img src={url} alt="Instance" className="rounded-lg w-full h-32 object-cover" />
-                                            <button onClick={() => handleRemovePhoto(url)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <XIcon className="w-4 h-4" />
-                                            </button>
+                                            <button onClick={() => handleRemovePhoto(url)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><XIcon className="w-4 h-4" /></button>
                                         </div>
                                     ))}
                                 </div>
@@ -514,7 +434,7 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                     )}
                     {activeTab === 'calendar' && (
                         <div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Click dates to manually block them. Dates with reservations cannot be changed.</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Click dates to manually block them for maintenance. Dates with reservations cannot be changed.</p>
                             {isCalendarLoading ? <p className="text-center">Loading calendar...</p> : (
                                 <>
                                     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mb-4 text-xs">
@@ -528,9 +448,7 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                                             <h3 className="font-semibold text-slate-800 dark:text-slate-200">{format(currentDate, 'MMMM yyyy')}</h3>
                                             <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><ChevronDownIcon className="w-5 h-5 transform -rotate-90" /></button>
                                         </div>
-                                        <div className="grid grid-cols-7 mb-2 text-center text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}
-                                        </div>
+                                        <div className="grid grid-cols-7 mb-2 text-center text-xs text-slate-500 dark:text-slate-400 font-semibold">{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}</div>
                                         <div className="grid grid-cols-7">{renderCalendar()}</div>
                                     </div>
                                 </>
@@ -542,21 +460,18 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
 
                 <div className="p-4 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 mt-auto rounded-b-lg">
                     <Button onClick={onClose} className="!w-auto" variant="secondary">Cancel</Button>
-                    <Button onClick={handleSaveChanges} isLoading={isSaving} disabled={!hasDetailChanges && !hasCalendarChanges} className="!w-auto">Save Changes</Button>
+                    <Button onClick={handleSaveChanges} isLoading={isSaving} disabled={!hasChanges} className="!w-auto">Save Changes</Button>
                 </div>
             </div>
         </div>
     );
 };
 
-// ... Rest of the file (Instance Manager, Main Component, etc.)
-// FIX: Corrected import for 'checkAvailabilityApi' from the backend inventory API instead of the room API.
 const AvailabilityCheckModal: React.FC<{
     inventory: InventoryItemWithQuantity[];
     areas: Area[];
     onClose: () => void;
 }> = ({ inventory, areas, onClose }) => {
-    // ... Implementation is unchanged as it was not part of the user request.
     const today = new Date().toISOString().split('T')[0];
     const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(today);
@@ -589,37 +504,26 @@ const AvailabilityCheckModal: React.FC<{
 
     const searchResults = useMemo(() => {
         if (!searchQuery) return [];
-        return inventory.filter(
-            item =>
-                item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-                !selectedItems.has(item.id)
-        );
+        return inventory.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) && !selectedItems.has(item.id));
     }, [searchQuery, inventory, selectedItems]);
+
     const handleSelectItem = (item: InventoryItemWithQuantity) => {
         setSelectedItems(prev => {
             const newMap = new Map(prev);
-            newMap.set(item.id, {
-                name: item.name,
-                areaName: areas.find(a => a.id === item.areaId)?.name || 'N/A',
-            });
+            newMap.set(item.id, { name: item.name, areaName: areas.find(a => a.id === item.areaId)?.name || 'N/A' });
             return newMap;
         });
         setSearchQuery('');
     };
+
     const handleRemoveItem = (itemId: string) => {
-        setSelectedItems(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(itemId);
-            return newMap;
-        });
+        setSelectedItems(prev => { const newMap = new Map(prev); newMap.delete(itemId); return newMap; });
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-slate-600">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Check Instance Availability</h3>
-                </div>
+                <div className="p-6 border-b dark:border-slate-600"><h3 className="text-xl font-bold text-slate-900 dark:text-white">Check Instance Availability</h3></div>
                 <div className="p-6 space-y-4 flex-grow overflow-y-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input label="Start Date" id="check-start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -657,9 +561,7 @@ const AvailabilityCheckModal: React.FC<{
                         {selectedItems.size === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-4">Search for items to check their availability.</p>}
                     </div>
                 </div>
-                 <div className="p-6 flex justify-end gap-3 border-t dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50">
-                    <Button onClick={onClose} className="!w-auto" variant="secondary">Close</Button>
-                </div>
+                 <div className="p-6 flex justify-end gap-3 border-t dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50"><Button onClick={onClose} className="!w-auto" variant="secondary">Close</Button></div>
             </div>
         </div>
     );
@@ -673,26 +575,18 @@ const InstanceActionMenu: React.FC<{
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false);
-        };
+        const handleClickOutside = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
     const handleAction = (action: () => void) => { action(); setIsOpen(false); };
     return (
         <div className="relative" ref={menuRef} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" aria-label="Options">
-                <EllipsisVerticalIcon className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-            </button>
+            <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" aria-label="Options"><EllipsisVerticalIcon className="w-5 h-5 text-slate-500 dark:text-slate-400" /></button>
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-10 overflow-hidden">
-                    <button onClick={() => handleAction(() => onEdit(instance))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">
-                        <PencilIcon className="w-3 h-3" /> Edit
-                    </button>
-                    <button onClick={() => handleAction(() => onDelete(instance))} className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 border-t dark:border-slate-700">
-                        <TrashIcon className="w-3 h-3" /> Delete
-                    </button>
+                    <button onClick={() => handleAction(() => onEdit(instance))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"><PencilIcon className="w-3 h-3" /> Edit</button>
+                    <button onClick={() => handleAction(() => onDelete(instance))} className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 border-t dark:border-slate-700"><TrashIcon className="w-3 h-3" /> Delete</button>
                 </div>
             )}
         </div>
@@ -708,40 +602,24 @@ const ItemActionMenu: React.FC<{
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false);
-        };
+        const handleClickOutside = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
     const handleAction = (action: () => void) => { action(); setIsOpen(false); };
     return (
         <div className="relative" ref={menuRef} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" aria-label="Options">
-                <EllipsisVerticalIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
-            </button>
+            <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" aria-label="Options"><EllipsisVerticalIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-10 overflow-hidden">
-                    <button onClick={() => handleAction(() => onEdit(item))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">
-                        <PencilIcon className="w-4 h-4" /> Edit
-                    </button>
-                    <button onClick={() => handleAction(() => onHide(item))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">
-                        {item.isHidden ? <EyeIcon className="w-4 h-4" /> : <EyeSlashIcon className="w-4 h-4" />}
-                        {item.isHidden ? 'Unhide' : 'Hide'}
-                    </button>
-                    <button onClick={() => handleAction(() => onDelete(item))} className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 border-t dark:border-slate-700">
-                        <TrashIcon className="w-4 h-4" /> Delete
-                    </button>
+                    <button onClick={() => handleAction(() => onEdit(item))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"><PencilIcon className="w-4 h-4" /> Edit</button>
+                    <button onClick={() => handleAction(() => onHide(item))} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2">{item.isHidden ? <EyeIcon className="w-4 h-4" /> : <EyeSlashIcon className="w-4 h-4" />}{item.isHidden ? 'Unhide' : 'Hide'}</button>
+                    <button onClick={() => handleAction(() => onDelete(item))} className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 border-t dark:border-slate-700"><TrashIcon className="w-4 h-4" /> Delete</button>
                 </div>
             )}
         </div>
     );
 };
-
-// ...
-// ... The rest of the `EquipmentManagement.tsx` component is large but does not require changes for this user request.
-// It will be included here as it is part of the file.
-// ...
 
 interface EquipmentManagementProps {
     searchQuery: string;
@@ -751,24 +629,22 @@ interface EquipmentManagementProps {
 const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, areaFilter }) => {
     const { user } = useAuth();
     const [inventory, setInventory] = useState<InventoryItemWithQuantity[]>([]);
+    const [allEquipmentRequests, setAllEquipmentRequests] = useState<EquipmentRequest[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
     
-    // Manage Item Modals
     const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<InventoryItemWithQuantity | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<InventoryItemWithQuantity | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Manage Instance Modals
     const [isAddInstanceModalOpen, setIsAddInstanceModalOpen] = useState(false);
     const [itemForNewInstance, setItemForNewInstance] = useState<InventoryItemWithQuantity | null>(null);
     const [instanceToEdit, setInstanceToEdit] = useState<InventoryInstance | null>(null);
     const [showDeleteInstanceConfirm, setShowDeleteInstanceConfirm] = useState<InventoryInstance | null>(null);
     
-    // Manage Utility Modals
     const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
     const [viewingInstance, setViewingInstance] = useState<InventoryInstance | null>(null);
 
@@ -776,9 +652,14 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
         setIsLoading(true);
         setError('');
         try {
-            const [invData, areasData] = await Promise.all([getInventoryApi(), getAreasApi()]);
+            const [invData, areasData, requestsData] = await Promise.all([
+                getInventoryApi(), 
+                getAreasApi(),
+                getAllEquipmentRequestsApi(),
+            ]);
             setInventory(invData);
             setAreas(areasData);
+            setAllEquipmentRequests(requestsData);
         } catch (err) {
             setError('Failed to load inventory data.');
         } finally {
@@ -825,7 +706,6 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
         }
     };
     
-    // --- Action Handlers for Item Types ---
     const handleEditItem = (item: InventoryItemWithQuantity) => { setItemToEdit(item); setIsAddItemModalOpen(true); };
     const handleToggleHide = async (item: InventoryItemWithQuantity) => {
         try { await updateInventoryItemApi(item.id, { name: item.name, areaId: item.areaId, isHidden: !item.isHidden }); fetchData(); } catch (err) { console.error("Failed to toggle visibility", err); }
@@ -837,7 +717,6 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
         try { await deleteInventoryItemApi(showDeleteConfirm.id); fetchData(); setShowDeleteConfirm(null); } catch (err) { console.error("Failed to delete item", err); } finally { setIsDeleting(false); }
     };
 
-    // --- Action Handlers for Instances ---
     const handleEditInstance = (instance: InventoryInstance) => {
         const parent = inventory.find(i => i.id === instance.itemId);
         if (parent) { setItemForNewInstance(parent); setInstanceToEdit(instance); setIsAddInstanceModalOpen(true); }
@@ -852,32 +731,42 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
     const InstanceManager: React.FC<{ item: InventoryItemWithQuantity }> = ({ item }) => {
         const [instances, setInstances] = useState<InventoryInstance[]>([]);
         const [isLoading, setIsLoading] = useState(true);
+        
         useEffect(() => {
             const fetchInstances = async () => {
-                if (!item.id) {
-                    setIsLoading(false);
-                    return;
-                }
+                if (!item.id) { setIsLoading(false); return; }
                 setIsLoading(true);
                 try {
                     const data = await getInstancesByItemIdApi(item.id);
                     setInstances(data);
-                } catch (error) { 
-                    console.error(`Failed to fetch instances for item: '${item.name}'`, error); 
-                } finally { 
-                    setIsLoading(false); 
-                }
+                } catch (error) { console.error(`Failed to fetch instances for item: '${item.name}'`, error); } 
+                finally { setIsLoading(false); }
             };
             fetchInstances();
         }, [item.id, item.quantity.total]);
+
+        const getTodayStatus = useCallback((instance: InventoryInstance): InventoryInstanceStatus => {
+            const today = startOfDay(new Date()); // Use start of day for consistent comparison
+            if (instance.status === 'Under Maintenance') return 'Under Maintenance';
+
+            const isReservedToday = allEquipmentRequests.some(req => {
+                if (!req.assignedItems?.some(asgn => asgn.instanceId === instance.id)) return false;
+                const isActiveRequest = ['Approved', 'Ready for Pickup', 'In Use', 'Overdue'].includes(req.status);
+                if (!isActiveRequest) return false;
+                const reservationStart = startOfDay(new Date(req.requestedStartDate));
+                const reservationEnd = endOfDay(new Date(req.requestedEndDate));
+                return isWithinInterval(today, { start: reservationStart, end: reservationEnd });
+            });
+
+            if (isReservedToday) return 'Reserved';
+            return 'Available';
+        }, [allEquipmentRequests]);
 
         return (
             <div className="p-4 bg-gray-50 dark:bg-gray-700/50">
                 <div className="flex justify-between items-center mb-4">
                     <h4 className="font-semibold dark:text-gray-200">Instances ({item.quantity.total})</h4>
-                    <button onClick={() => handleOpenAddInstanceModal(item)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <PlusIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                    </button>
+                    <button onClick={() => handleOpenAddInstanceModal(item)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"><PlusIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" /></button>
                 </div>
                 {isLoading ? <p className="text-sm dark:text-gray-400">Loading instances...</p> : (
                     <div className="overflow-x-auto">
@@ -895,14 +784,10 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
                                     <tr key={inst.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer transition-colors" onClick={() => handleViewInstance(inst, item)}>
                                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{inst.serialNumber}</td>
                                         <td className="px-4 py-3"><ConditionBadge condition={inst.condition} /></td>
-                                        <td className="px-4 py-3"><StatusBadge status={inst.status} /></td>
-                                        <td className="px-4 py-3 text-right">
-                                            <InstanceActionMenu instance={inst} onEdit={handleEditInstance} onDelete={handleDeleteInstanceClick} />
-                                        </td>
+                                        <td className="px-4 py-3"><StatusBadge status={getTodayStatus(inst)} /></td>
+                                        <td className="px-4 py-3 text-right"><InstanceActionMenu instance={inst} onEdit={handleEditInstance} onDelete={handleDeleteInstanceClick} /></td>
                                     </tr>
-                                )) : (
-                                    <tr><td colSpan={4} className="px-4 py-3 text-center">No instances found.</td></tr>
-                                )}
+                                )) : ( <tr><td colSpan={4} className="px-4 py-3 text-center">No instances found.</td></tr> )}
                             </tbody>
                         </table>
                     </div>
