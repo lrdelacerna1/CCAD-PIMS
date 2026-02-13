@@ -164,9 +164,9 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
         if (user.role === 'student' || user.role === 'guest') {
-            if (!endorserName.trim()) { setError("Endorser\\'s name is required."); return; }
-            if (!endorserPosition.trim()) { setError("Endorser\\'s position is required."); return; }
-            if (!endorserEmail.trim()) { setError("Endorser\\'s email is required."); return; }
+            if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
+            if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
+            if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
         }
         if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
         if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
@@ -216,7 +216,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         .filter(({ instance }) => !requestItems.has(instance.id))
         .map(({ instance, item }) => ({
             value: instance.id,
-            label: `${item.name} (SN: ${instance.serialNumber})`
+            label: `${item.name} (AT: ${instance.assetTag})`
         }));
         
     const cartEntries = Array.from(requestItems.values());
@@ -306,7 +306,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 <div className="mt-2 space-y-2">
                                     {cartEntries.map(({ item, instance }) => (
                                         <div key={instance.id} className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded">
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">{item.name} (SN: {instance.serialNumber})</span>
+                                            <span className="text-sm text-slate-600 dark:text-slate-300">{item.name} (Asset Tag: {instance.assetTag})</span>
                                             <button type="button" onClick={() => handleRemoveItem(instance.id)} className="text-slate-400 hover:text-rose-500" title="Remove item">
                                                 <XIcon className="w-5 h-5"/>
                                             </button>
@@ -326,7 +326,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
                                     <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
                                     <Input 
-                                        label="Endorser\\'s Name (Faculty/Advisor)"
+                                        label="Endorser's Name (Faculty/Advisor)"
                                         id="endorser-name"
                                         type="text"
                                         value={endorserName}
@@ -335,7 +335,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         required
                                     />
                                     <Input 
-                                        label="Endorser\\'s Position"
+                                        label="Endorser's Position"
                                         id="endorser-position"
                                         type="text"
                                         value={endorserPosition}
@@ -344,7 +344,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         required
                                     />
                                     <Input 
-                                        label="Endorser\\'s Email"
+                                        label="Endorser's Email"
                                         id="endorser-email"
                                         type="email"
                                         value={endorserEmail}
