@@ -70,8 +70,8 @@ export const EquipmentRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
         
-        const isStudent = requestingUser && requestingUser.role === 'student';
-        const initialStatus: EquipmentRequestStatus = isStudent ? 'Pending Endorsement' : 'Pending Approval';
+        const needsEndorsement = requestingUser && (requestingUser.role === 'student' || requestingUser.role === 'guest');
+        const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
 
         const newRequestData = {
             ...data,
@@ -133,6 +133,22 @@ export const EquipmentRequestService = {
             isRead: false,
             link: "/my-reservations"
         });
+
+        // Notify Endorser as well
+        if (request.endorserEmail) {
+            const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
+            const endorserSnapshot = await getDocs(endorserQuery);
+            if (!endorserSnapshot.empty) {
+                const endorserId = endorserSnapshot.docs[0].id;
+                await NotificationService.createNotification({
+                    userId: endorserId,
+                    title: "Request Status Updated",
+                    message: `The equipment request for "${request.purpose}" by ${request.userName} has been updated to: ${status}.`,
+                    isRead: false,
+                    link: "/my-endorsements"
+                });
+            }
+        }
     },
     
     async updateStatusBatch(ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
@@ -153,8 +169,9 @@ export const EquipmentRequestService = {
         
         await batch.commit();
 
-        // Notify Requesters
+        // Notify Requesters and Endorsers
         for (const req of requestsToNotify) {
+            // Notify Requester
              await NotificationService.createNotification({
                 userId: req.userId,
                 title: "Request Status Updated",
@@ -162,6 +179,22 @@ export const EquipmentRequestService = {
                 isRead: false,
                 link: "/my-reservations"
             });
+
+            // Notify Endorser
+            if (req.endorserEmail) {
+                const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
+                const endorserSnapshot = await getDocs(endorserQuery);
+                if (!endorserSnapshot.empty) {
+                    const endorserId = endorserSnapshot.docs[0].id;
+                    await NotificationService.createNotification({
+                        userId: endorserId,
+                        title: "Request Status Updated",
+                        message: `The equipment request for "${req.purpose}" by ${req.userName} has been updated to: ${status}.`,
+                        isRead: false,
+                        link: "/my-endorsements"
+                    });
+                }
+            }
         }
     }
 }

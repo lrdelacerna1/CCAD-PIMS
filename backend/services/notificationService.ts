@@ -5,7 +5,7 @@ import {
     where, 
     getDocs, 
     doc, 
-    getDoc, // Correctly import getDoc
+    getDoc,
     updateDoc, 
     addDoc, 
     serverTimestamp, 
@@ -39,7 +39,7 @@ export class NotificationService {
         const notificationRef = doc(db, "notifications", notificationId);
         await updateDoc(notificationRef, { isRead: true });
         
-        const updatedDoc = await getDoc(notificationRef); // Use getDoc for a single document
+        const updatedDoc = await getDoc(notificationRef);
         if (updatedDoc.exists()) {
              const data = updatedDoc.data();
              return {
@@ -65,9 +65,12 @@ export class NotificationService {
 
     static async createNotification(notificationData: Omit<Notification, 'id' | 'createdAt'>): Promise<void> {
         await addDoc(notificationsCollection, {
-            ...notificationData,
+            userId: notificationData.userId,
+            title: notificationData.title,
+            message: notificationData.message,
+            link: notificationData.link || '',
+            isRead: false,
             createdAt: serverTimestamp(),
-            isRead: false, // Ensure new notifications are unread
         });
     }
 }
