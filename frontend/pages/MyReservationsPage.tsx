@@ -52,9 +52,26 @@ const RequestsTable: React.FC<{
         return areasMap.get(areaId) || 'Unknown Area';
     };
     const getDateTimeString = (req: AnyRequest) => {
-        const start = format(new Date(req.requestedStartDate + 'T00:00:00Z'), 'MMM d, yyyy');
+        const createDate = (dateStr: string) => {
+            if (!dateStr) return null;
+            let d;
+            if (dateStr.includes('T')) {
+                d = new Date(dateStr);
+            } else {
+                d = new Date(dateStr + 'T00:00:00Z');
+            }
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        const startDate = createDate(req.requestedStartDate);
+        if (!startDate) return "Invalid date";
+
+        const start = format(startDate, 'MMM d, yyyy');
+
         if ('requestedItems' in req) {
-            const end = format(new Date(req.requestedEndDate + 'T00:00:00Z'), 'MMM d, yyyy');
+            const endDate = createDate(req.requestedEndDate);
+            if (!endDate) return start;
+            const end = format(endDate, 'MMM d, yyyy');
             return start === end ? start : `${start} to ${end}`;
         } else {
             return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
