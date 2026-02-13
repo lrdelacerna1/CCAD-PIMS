@@ -69,8 +69,8 @@ export const RoomRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
         
-        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'superadmin');
-        const initialStatus: RoomRequestStatus = isAdminRequest ? 'Pending Approval' : 'Pending Endorsement';
+        const isStudent = requestingUser && requestingUser.role === 'student';
+        const initialStatus: RoomRequestStatus = isStudent ? 'Pending Endorsement' : 'Pending Approval';
 
         const newRequestData = {
             ...data,

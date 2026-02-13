@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Area, EquipmentRequest, RoomRequest, AllEquipmentRequestStatuses, AllRoomRequestStatuses, User, ReservationSettings } from '../types';
+import { Area, EquipmentRequest, RoomRequest, AllEquipmentRequestStatuses, AllRoomRequestStatuses, User, ReservationSettings, EquipmentRequestStatus, RoomRequestStatus } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { getAllEquipmentRequestsApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getAllRoomRequestsApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
@@ -58,7 +59,6 @@ const AllRequestsPage: React.FC = () => {
     const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
     const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
 
-    // Initialize activeTab from location state if available
     useEffect(() => {
         const stateTab = (location.state as any)?.activeTab;
         if (stateTab) {
@@ -92,14 +92,14 @@ const AllRequestsPage: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const handleStatusUpdate = async (request: AnyRequest, newStatus: any) => {
+    const handleStatusUpdate = async (request: AnyRequest, newStatus: EquipmentRequestStatus | RoomRequestStatus) => {
         setIsUpdatingId(request.id);
         setError('');
         try {
             if ('requestedItems' in request) {
-                await updateEquipmentRequestStatusApi([request.id], newStatus);
+                await updateEquipmentRequestStatusApi([request.id], newStatus as EquipmentRequestStatus);
             } else {
-                await updateRoomRequestStatusApi([request.id], newStatus);
+                await updateRoomRequestStatusApi([request.id], newStatus as RoomRequestStatus);
             }
             fetchData();
         } catch (err) {
@@ -112,8 +112,11 @@ const AllRequestsPage: React.FC = () => {
     const usersMap = useMemo(() => new Map(users.map(user => [user.id, user])), [users]);
     const areasMap = useMemo(() => new Map(areas.map(area => [area.id, area.name])), [areas]);
     const getAreaId = (req: AnyRequest) => {
-        if ('requestedItems' in req) return req.requestedItems[0]?.areaId;
-        if ('requestedRoom' in req) return req.requestedRoom.areaId;
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
+        if ('roomTypeId' in req) {
+             const room = areas.find(area => area.id === req.roomTypeId);
+             return room ? room.id : '';
+        }
         return '';
     };
 
@@ -128,7 +131,7 @@ const AllRequestsPage: React.FC = () => {
         if (activeTab === 'equipment') {
             processed = processed.filter(r => 'requestedItems' in r);
         } else if (activeTab === 'room') {
-            processed = processed.filter(r => 'requestedRoom' in r);
+            processed = processed.filter(r => 'roomTypeId' in r);
         }
 
         if (areaFilter !== 'all') processed = processed.filter(r => getAreaId(r) === areaFilter);
@@ -165,18 +168,31 @@ const AllRequestsPage: React.FC = () => {
         const isUpdating = isUpdatingId === request.id;
 
         switch (request.status) {
-            case 'For Approval':
-            case 'Pending Confirmation':
-                const approveStatus = 'requestedItems' in request ? 'Ready for Pickup' : 'Ready for Check-in';
+            case 'Pending Approval':
+                const approveStatus = 'requestedItems' in request ? 'Approved' : 'Approved';
                 return (
                     <div className="flex gap-2">
                         <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, approveStatus); }} isLoading={isUpdating} variant="success" className="!w-auto !px-2 !py-1 text-xs">Approve</Button>
                         <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, 'Rejected'); }} isLoading={isUpdating} variant="danger" className="!w-auto !px-2 !py-1 text-xs">Reject</Button>
                     </div>
                 );
+            case 'Approved':
+                 const readyStatus = 'requestedItems' in request ? 'Ready for Pickup' : 'Ready for Check-in';
+                 return (
+                    <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, readyStatus); }} isLoading={isUpdating} variant="primary" className="!w-auto !px-2 !py-1 text-xs">Mark as Ready</Button>
+                );
             case 'Ready for Pickup':
-                return (
-                    <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, 'Closed'); }} isLoading={isUpdating} variant="dark" className="!w-auto !px-2 !py-1 text-xs">Mark as Closed</Button>
+                 return (
+                    <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, 'In Use'); }} isLoading={isUpdating} variant="dark" className="!w-auto !px-2 !py-1 text-xs">Check Out</Button>
+                );
+             case 'Ready for Check-in':
+                 return (
+                    <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, 'In Use'); }} isLoading={isUpdating} variant="dark" className="!w-auto !px-2 !py-1 text-xs">Check In</Button>
+                );
+             case 'In Use':
+                 const closeStatus = 'requestedItems' in request ? 'Returned' : 'Completed';
+                 return (
+                    <Button onClick={(e) => { e.stopPropagation(); handleStatusUpdate(request, closeStatus); }} isLoading={isUpdating} variant="dark" className="!w-auto !px-2 !py-1 text-xs">Close</Button>
                 );
             default:
                 return <span className="text-slate-400 dark:text-slate-500">-</span>;
@@ -195,7 +211,6 @@ const AllRequestsPage: React.FC = () => {
                 </nav>
             </div>
             
-            {/* Standard Requests View */}
             {activeTab !== 'accountability' && (
                 <>
                     <div className="flex justify-between items-center mb-6">
@@ -242,7 +257,7 @@ const AllRequestsPage: React.FC = () => {
                                                             return <UserIcon className="w-5 h-5 text-slate-400 flex-shrink-0" title="User" />;
                                                         }
                                                         switch (userForRequest.role) {
-                                                            case 'user':
+                                                            case 'student':
                                                                 return <AcademicCapIcon className="w-5 h-5 text-slate-500 flex-shrink-0" title="Student/User" />;
                                                             case 'admin':
                                                             case 'superadmin':
@@ -279,7 +294,6 @@ const AllRequestsPage: React.FC = () => {
                 </>
             )}
 
-            {/* Accountability Tab Content */}
             {activeTab === 'accountability' && <AccountabilityList />}
 
              {isNewRequestModalOpen && (

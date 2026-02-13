@@ -52,15 +52,15 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                 return (
                     <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-heading">Managing User Requests</h3>
-                        <p>Your primary role is to process incoming requests for resources. The <span className="font-semibold">'Requests'</span> page is your main queue for items needing immediate attention.</p>
+                        <p>Your primary role is to process incoming requests for resources. The <span className="font-semibold">'Reservations'</span> page is your main queue for items needing immediate attention.</p>
                         
                         <SectionHeader icon={<ClipboardDocumentCheckIcon className="w-5 h-5 text-black dark:text-white"/>} title="The Request Lifecycle" />
                         <ul className="list-decimal list-inside space-y-3 pl-2">
-                            <li><span className="font-semibold">Pending Confirmation:</span> A user has submitted a request. It is now awaiting endorsement from a faculty member or other authority before it reaches your queue. No action is needed from you at this stage.</li>
-                            <li><span className="font-semibold">For Approval:</span> The request has been endorsed and now appears in your 'Requests' queue. You should review the purpose and dates, then either approve or reject it.</li>
-                            <li><span className="font-semibold">Approve:</span> Approving a request changes its status to 'Ready for Pickup' (for equipment) or 'Ready for Check-in' (for rooms). The system notifies the user.</li>
-                            <li><span className="font-semibold">Reject:</span> If a request cannot be fulfilled (e.g., due to a conflict or policy), reject it. You will be prompted to provide a brief reason, which is sent to the user.</li>
-                             <li><span className="font-semibold">Closed:</span> The reservation is complete. This happens after an item has been successfully returned or a room booking has ended.</li>
+                            <li><span className="font-semibold">Pending Endorsement:</span> A student has submitted a request that requires faculty endorsement. It will not appear in your main approval queue until it is endorsed.</li>
+                            <li><span className="font-semibold">Pending Approval:</span> The request has been endorsed (or was submitted by a non-student) and now appears in your 'Reservations' queue. You should review the purpose and dates, then either approve or reject it.</li>
+                            <li><span className="font-semibold">Approve:</span> Approving a request changes its status to 'Approved'. The user is notified. You can then proceed to mark it as 'Ready for Pickup' or 'Ready for Check-in' when the time comes.</li>
+                            <li><span className="font-semibold">Reject:</span> If a request cannot be fulfilled, reject it. The user will be notified.</li>
+                             <li><span className="font-semibold">Closed/Completed/Returned:</span> The reservation is complete. This happens after an item has been successfully returned or a room booking has ended.</li>
                         </ul>
 
                         <SectionHeader icon={<ClipboardDocumentCheckIcon className="w-5 h-5 text-black dark:text-white"/>} title="Frequently Asked Questions (FAQ)" />
@@ -155,13 +155,15 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                      <div>
                         <SectionHeader icon={<TagIcon className="w-5 h-5 text-black dark:text-white" />} title="Request Statuses" />
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 mb-4">
-                             <LegendItem label="Pending Confirmation" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Awaiting initial endorsement (e.g., from a faculty advisor) before it is sent to an area admin." />
-                             <LegendItem label="For Approval" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="The request has been endorsed and is now in the area admin's queue for final review." />
-                             <LegendItem label="Ready for Pickup / Check-in" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="Admin has approved the request. The item/room is ready for the user." />
-                             <LegendItem label="Closed" badgeClass="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300" description="The reservation is complete (e.g., item returned)." />
+                             <LegendItem label="Pending Endorsement" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Awaiting initial endorsement (e.g., from a faculty advisor) before it is sent to an area admin." />
+                             <LegendItem label="Pending Approval" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="The request has been endorsed and is now in the area admin's queue for final review." />
+                             <LegendItem label="Approved" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="Admin has approved the request. The item/room is ready for the user." />
+                             <LegendItem label="Ready for Pickup / Check-in" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="The item/room is ready for the user to pickup or check-in." />
+                             <LegendItem label="In Use" badgeClass="bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300" description="The item has been picked up or the room has been checked into." />
+                             <LegendItem label="Returned / Completed" badgeClass="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300" description="The reservation is complete." />
                              <LegendItem label="Overdue" badgeClass="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" description="The item was not returned or the room was not checked out on time." />
                              <LegendItem label="Rejected" badgeClass="bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" description="Admin has denied the request." />
-                             <LegendItem label="Cancelled" badgeClass="bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400" description="The request was cancelled by the user or an admin before fulfillment." />
+                             <LegendItem label="Cancelled" badgeClass="bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400" description="The request was cancelled by the user." />
                         </div>
 
                         <SectionHeader icon={<InventoryIcon className="w-5 h-5 text-black dark:text-white" />} title="Equipment & Room Conditions" />
@@ -187,19 +189,19 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                             <li><span className="font-semibold">Browse the Catalog:</span> Go to the 'Catalog' page to see all available equipment and rooms. You can search and filter by campus area.</li>
                             <li><span className="font-semibold">Select Your Dates:</span> In the cart sidebar on the right, choose the start and end dates for your reservation. The catalog will automatically show what's available for that period.</li>
                             <li><span className="font-semibold">Add to Cart:</span> Click 'Add to Cart' for any item you need. For equipment, you can add multiple types and adjust quantities in the cart. For rooms, you can only reserve one at a time.</li>
-                            <li><span className="font-semibold">Finalize & Submit:</span> Once your cart is ready, click 'Finalize Request'. A form will appear where you'll provide details like the purpose of your request. After submitting, your request is sent for approval.</li>
+                            <li><span className="font-semibold">Finalize & Submit:</span> Once your cart is ready, click 'Finalize Request'. A form will appear where you'll provide details like the purpose of your request and an endorser if you are a student. After submitting, your request is sent for approval.</li>
                         </ul>
 
                         <SectionHeader icon={<ClipboardDocumentCheckIcon className="w-5 h-5 text-black dark:text-white"/>} title="Frequently Asked Questions (FAQ)" />
                          <div className="space-y-2">
                             <FAQItem question="What happens after I submit my request?">
-                                <p>Your request first goes into a 'Pending Confirmation' state, where it waits for endorsement from a faculty member or other authority. Once endorsed, its status changes to 'For Approval' and is sent to an administrator. You will receive notifications as your request status changes.</p>
+                                <p>If you are a student, your request will first go to your specified endorser with a status of 'Pending Endorsement'. Once endorsed, its status changes to 'Pending Approval' and is sent to an administrator. If you are not a student, your request goes directly to 'Pending Approval'. You will receive notifications as your request status changes.</p>
                             </FAQItem>
                              <FAQItem question="Why is an item I want 'Unavailable'?">
                                 <p>An item is marked as 'Unavailable' if all its units are already reserved by other users for the date range you have selected (including requests that are still pending approval). Try adjusting your dates to see if it becomes available.</p>
                             </FAQItem>
                             <FAQItem question="Can I cancel a request?">
-                                <p>Yes, you can cancel most requests from the 'My Reservations' page as long as they haven't been picked up or checked into yet.</p>
+                                <p>Yes, you can cancel most requests from the 'My Reservations' page as long as they are in the 'Pending Endorsement', 'Pending Approval', or 'Approved' status.</p>
                             </FAQItem>
                         </div>
                     </div>
@@ -209,11 +211,13 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                     <div>
                         <SectionHeader icon={<TagIcon className="w-5 h-5 text-black dark:text-white" />} title="Your Request Statuses" />
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 mb-4">
-                             <LegendItem label="Pending Confirmation" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been submitted and is awaiting endorsement (e.g., by a faculty advisor)." />
-                             <LegendItem label="For Approval" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been endorsed and is now waiting for a final review from an area administrator." />
-                             <LegendItem label="Ready for Pickup / Check-in" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="Your request is approved! You can pick up your equipment or check into your room on the scheduled date." />
-                             <LegendItem label="Closed" badgeClass="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300" description="Your reservation is complete. The equipment has been returned or the room booking has ended." />
-                             <LegendItem label="Overdue" badgeClass="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" description="The equipment was not returned on time. Please return it as soon as possible to avoid penalties." />
+                             <LegendItem label="Pending Endorsement" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been submitted and is awaiting endorsement by your specified endorser." />
+                             <LegendItem label="Pending Approval" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been endorsed and is now waiting for a final review from an area administrator." />
+                             <LegendItem label="Approved" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="Your request has been approved! It will be ready on the scheduled date." />
+                             <LegendItem label="Ready for Pickup / Check-in" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="The item/room is ready for you." />
+                              <LegendItem label="In Use" badgeClass="bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300" description="You have picked up the item or checked into the room." />
+                             <LegendItem label="Returned / Completed" badgeClass="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300" description="Your reservation is complete." />
+                             <LegendItem label="Overdue" badgeClass="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" description="The item was not returned on time. Please return it as soon as possible to avoid penalties." />
                              <LegendItem label="Rejected" badgeClass="bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" description="An administrator has denied your request. You will receive a notification with the reason." />
                              <LegendItem label="Cancelled" badgeClass="bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400" description="The request was cancelled either by you or an administrator before it was fulfilled." />
                         </div>

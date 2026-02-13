@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Area, EquipmentRequest, RoomRequest, Penalty, AllEquipmentRequestStatuses, AllRoomRequestStatuses } from '../types';
+import { Area, EquipmentRequest, RoomRequest, Penalty, AllEquipmentRequestStatuses, AllRoomRequestStatuses, EquipmentRequestStatus, RoomRequestStatus } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { getEquipmentRequestsByEndorserApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getRoomRequestsByEndorserApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
@@ -11,8 +12,6 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { SearchIcon } from '../components/Icons';
 import ReservationDetailsModal from '../components/reservations/ReservationDetailsModal';
-
-// --- Reusable Components ---
 
 type AnyRequest = EquipmentRequest | RoomRequest;
 
@@ -35,7 +34,6 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     return <span className={`${baseClasses} ${colors[colorKey] || colors['closed']}`}>{status}</span>;
 };
 
-
 const RequestsTable: React.FC<{
     requests: AnyRequest[];
     onEndorse: (req: AnyRequest) => void;
@@ -45,9 +43,9 @@ const RequestsTable: React.FC<{
     resourceType: 'equipment' | 'room';
 }> = ({ requests, onEndorse, onReject, onRowClick, areasMap, resourceType }) => {
     
-    const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : req.requestedRoom.name;
+    const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
     const getAreaName = (req: AnyRequest) => {
-        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : req.requestedRoom.areaId;
+        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : ('requestedRoom' in req ? req.requestedRoom.areaId : '');
         return areasMap.get(areaId) || 'Unknown Area';
     };
     const getDateTimeString = (req: AnyRequest) => {
@@ -56,7 +54,7 @@ const RequestsTable: React.FC<{
             const end = format(new Date(req.requestedEndDate + 'T00:00:00Z'), 'MMM d, yyyy');
             return start === end ? start : `${start} to ${end}`;
         } else {
-            return `${start} at ${req.requestedStartTime} - ${req.requestedEndTime}`;
+            return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
         }
     };
     
@@ -88,12 +86,16 @@ const RequestsTable: React.FC<{
                             <td className="px-6 py-4">{getDateTimeString(req)}</td>
                             <td className="px-6 py-4"><StatusBadge status={req.status} /></td>
                             <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
-                                <Button variant="success" className="!w-auto !py-1 !px-3 text-xs" onClick={() => onEndorse(req)}>
-                                    Endorse
-                                </Button>
-                                <Button variant="danger" className="!w-auto !py-1 !px-3 text-xs" onClick={() => onReject(req)}>
-                                    Reject
-                                </Button>
+                                {req.status === 'Pending Endorsement' && (
+                                    <div className="flex gap-2">
+                                        <Button variant="success" className="!w-auto !py-1 !px-3 text-xs" onClick={() => onEndorse(req)}>
+                                            Endorse
+                                        </Button>
+                                        <Button variant="danger" className="!w-auto !py-1 !px-3 text-xs" onClick={() => onReject(req)}>
+                                            Reject
+                                        </Button>
+                                    </div>
+                                )}
                             </td>
                         </tr>
                     ))}
@@ -117,7 +119,6 @@ const MyEndorsementsPage: React.FC = () => {
     
     const [searchQuery, setSearchQuery] = useState('');
     const [areaFilter, setAreaFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     
     const [requestToAction, setRequestToAction] = useState<AnyRequest | null>(null);
@@ -160,93 +161,51 @@ const MyEndorsementsPage: React.FC = () => {
 
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
-    const categorizedEq = useMemo(() => {
-        let filteredRequests = equipmentRequests;
-
-        if (statusFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.status === statusFilter);
-        }
+    const filterAndSortRequests = (requests: AnyRequest[]) => {
+        let filtered = requests;
         if (areaFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.requestedItems.some(item => item.areaId === areaFilter));
+            filtered = filtered.filter(req => ('requestedItems' in req ? req.requestedItems[0]?.areaId : ('requestedRoom' in req ? req.requestedRoom.areaId : '')) === areaFilter);
         }
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
-            filteredRequests = filteredRequests.filter(req => 
+            filtered = filtered.filter(req => 
                 req.purpose.toLowerCase().includes(lowercasedQuery) ||
-                req.requestedItems.some(item => item.name.toLowerCase().includes(lowercasedQuery))
+                ('requestedItems' in req ? req.requestedItems[0]?.name.toLowerCase().includes(lowercasedQuery) : ('requestedRoom' in req ? req.requestedRoom.name.toLowerCase().includes(lowercasedQuery) : false))
             );
         }
         
-        const pending: EquipmentRequest[] = [];
-        const endorsed: EquipmentRequest[] = [];
-        const rejected: EquipmentRequest[] = [];
-
-        filteredRequests.forEach(r => {
-            if (r.status === 'For Endorsement') { pending.push(r); }
-            else if (r.status === 'Endorsed') { endorsed.push(r); }
-            else if (r.status === 'Rejected') { rejected.push(r); }
-        });
-
-        const dateSorter = (a: EquipmentRequest, b: EquipmentRequest) => {
+        return filtered.sort((a, b) => {
             const dateA = new Date(a.dateFiled).getTime();
             const dateB = new Date(b.dateFiled).getTime();
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-        };
+        });
+    };
 
-        pending.sort(dateSorter);
-        endorsed.sort(dateSorter);
-        rejected.sort(dateSorter);
-        
-        return { pending, endorsed, rejected };
-    }, [equipmentRequests, searchQuery, areaFilter, statusFilter, sortOrder]);
+    const categorizedEq = useMemo(() => {
+        return {
+            pending: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Pending Endorsement')),
+            endorsed: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Pending Approval')),
+            rejected: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Rejected')),
+        };
+    }, [equipmentRequests, searchQuery, areaFilter, sortOrder]);
 
     const categorizedRooms = useMemo(() => {
-        let filteredRequests = roomRequests;
-        if (statusFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.status === statusFilter);
-        }
-        if (areaFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.requestedRoom.areaId === areaFilter);
-        }
-        if (searchQuery.trim() !== '') {
-            const lowercasedQuery = searchQuery.toLowerCase();
-            filteredRequests = filteredRequests.filter(req => 
-                req.purpose.toLowerCase().includes(lowercasedQuery) ||
-                req.requestedRoom.name.toLowerCase().includes(lowercasedQuery)
-            );
-        }
-
-        const pending: RoomRequest[] = [];
-        const endorsed: RoomRequest[] = [];
-        const rejected: RoomRequest[] = [];
-
-        filteredRequests.forEach(r => {
-            if (r.status === 'For Endorsement') { pending.push(r); }
-            else if (r.status === 'Endorsed') { endorsed.push(r); }
-            else if (r.status === 'Rejected') { rejected.push(r); }
-        });
-
-        const dateSorter = (a: RoomRequest, b: RoomRequest) => {
-            const dateA = new Date(a.dateFiled).getTime();
-            const dateB = new Date(b.dateFiled).getTime();
-            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        return {
+            pending: filterAndSortRequests(roomRequests.filter(r => r.status === 'Pending Endorsement')),
+            endorsed: filterAndSortRequests(roomRequests.filter(r => r.status === 'Pending Approval')),
+            rejected: filterAndSortRequests(roomRequests.filter(r => r.status === 'Rejected')),
         };
-        
-        pending.sort(dateSorter);
-        endorsed.sort(dateSorter);
-        rejected.sort(dateSorter);
-        return { pending, endorsed, rejected };
-    }, [roomRequests, searchQuery, areaFilter, statusFilter, sortOrder]);
+    }, [roomRequests, searchQuery, areaFilter, sortOrder]);
     
     const handleAction = async () => {
         if (!requestToAction || !actionType) return;
         setIsProcessing(true);
         try {
-            const newStatus = actionType === 'endorse' ? 'For Approval' : 'Rejected';
+            const newStatus = actionType === 'endorse' ? 'Pending Approval' : 'Rejected';
             if ('requestedItems' in requestToAction) {
-                await updateEquipmentRequestStatusApi([requestToAction.id], newStatus);
+                await updateEquipmentRequestStatusApi([requestToAction.id], newStatus as EquipmentRequestStatus);
             } else {
-                await updateRoomRequestStatusApi([requestToAction.id], newStatus);
+                await updateRoomRequestStatusApi([requestToAction.id], newStatus as RoomRequestStatus);
             }
             setRequestToAction(null);
             setActionType(null);
@@ -261,14 +220,6 @@ const MyEndorsementsPage: React.FC = () => {
     const areaFilterOptions = useMemo(() => {
         return [{ value: 'all', label: 'All Areas' }, ...areas.map(a => ({ value: a.id, label: a.name }))];
     }, [areas]);
-
-    const statusFilterOptions = useMemo(() => {
-        const allStatuses = mainTab === 'equipment' ? AllEquipmentRequestStatuses : AllRoomRequestStatuses;
-        return [
-            { label: 'All Statuses', value: 'all' },
-            ...[...allStatuses].sort((a: string, b: string) => a.localeCompare(b)).map(s => ({ label: s, value: s }))
-        ];
-    }, [mainTab]);
 
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
@@ -293,7 +244,6 @@ const MyEndorsementsPage: React.FC = () => {
                 <h1 className="text-3xl font-bold dark:text-white font-heading">My Endorsements</h1>
             </div>
 
-            {/* Main Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     <button onClick={() => setMainTab('equipment')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${mainTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}>Equipment</button>
@@ -301,9 +251,8 @@ const MyEndorsementsPage: React.FC = () => {
                 </nav>
             </div>
             
-            {/* Filter Bar */}
             <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <Input 
                         label="Search"
                         id="search-endorsements"
@@ -319,13 +268,6 @@ const MyEndorsementsPage: React.FC = () => {
                         onChange={(e) => setAreaFilter(e.target.value)}
                         options={areaFilterOptions}
                     />
-                     <Select
-                        label="Filter by status"
-                        id="status-filter"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        options={statusFilterOptions}
-                    />
                     <Select
                         label="Sort by date filed"
                         id="sort-order"
@@ -339,7 +281,6 @@ const MyEndorsementsPage: React.FC = () => {
                 </div>
             </div>
             
-            {/* Content Area */}
             {isLoading && <p className="dark:text-white text-center">Loading...</p>}
             {error && <p className="text-red-500 text-center">{error}</p>}
             
@@ -354,15 +295,15 @@ const MyEndorsementsPage: React.FC = () => {
                     {mainTab === 'equipment' && (
                         <div className="space-y-4">
                            {nestedTab === 'pending' && (categorizedEq.pending.length > 0 ? <RequestsTable requests={categorizedEq.pending} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('pending', 'equipment', equipmentRequests.length > 0))}
-                           {nestedTab === 'endorsed' && (categorizedEq.endorsed.length > 0 ? <RequestsTable requests={categorizedEq.endorsed} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('endorsed', 'equipment', equipmentRequests.length > 0))}
-                           {nestedTab === 'rejected' && (categorizedEq.rejected.length > 0 ? <RequestsTable requests={categorizedEq.rejected} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('rejected', 'equipment', equipmentRequests.length > 0))}
+                           {nestedTab === 'endorsed' && (categorizedEq.endorsed.length > 0 ? <RequestsTable requests={categorizedEq.endorsed} onEndorse={(req) => {}} onReject={(req) => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('endorsed', 'equipment', equipmentRequests.length > 0))}
+                           {nestedTab === 'rejected' && (categorizedEq.rejected.length > 0 ? <RequestsTable requests={categorizedEq.rejected} onEndorse={(req) => {}} onReject={(req) => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('rejected', 'equipment', equipmentRequests.length > 0))}
                         </div>
                     )}
                     {mainTab === 'rooms' && (
                          <div className="space-y-4">
                            {nestedTab === 'pending' && (categorizedRooms.pending.length > 0 ? <RequestsTable requests={categorizedRooms.pending} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('pending', 'room', roomRequests.length > 0))}
-                           {nestedTab === 'endorsed' && (categorizedRooms.endorsed.length > 0 ? <RequestsTable requests={categorizedRooms.endorsed} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('endorsed', 'room', roomRequests.length > 0))}
-                           {nestedTab === 'rejected' && (categorizedRooms.rejected.length > 0 ? <RequestsTable requests={categorizedRooms.rejected} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('rejected', 'room', roomRequests.length > 0))}
+                           {nestedTab === 'endorsed' && (categorizedRooms.endorsed.length > 0 ? <RequestsTable requests={categorizedRooms.endorsed} onEndorse={(req) => {}} onReject={(req) => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('endorsed', 'room', roomRequests.length > 0))}
+                           {nestedTab === 'rejected' && (categorizedRooms.rejected.length > 0 ? <RequestsTable requests={categorizedRooms.rejected} onEndorse={(req) => {}} onReject={(req) => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('rejected', 'room', roomRequests.length > 0))}
                         </div>
                     )}
                 </div>

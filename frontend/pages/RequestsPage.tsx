@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-// FIX: Use specific request types instead of the legacy Reservation type.
-import { Area, EquipmentRequest, RoomRequest, User } from '../types';
+import { Area, EquipmentRequest, RoomRequest, User, EquipmentRequestStatus, RoomRequestStatus } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
-// FIX: Import from existing APIs for equipment and room requests.
 import { getAllEquipmentRequestsApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getAllRoomRequestsApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
 import { getAllUsersApi } from '../../backend/api/auth';
@@ -16,7 +14,6 @@ import { Button } from '../components/ui/Button';
 import { ToggleSwitch } from '../components/ui/ToggleSwitch';
 import ReservationDetailsModal from '../components/reservations/ReservationDetailsModal';
 
-// FIX: Combined request type for unified handling.
 type AnyRequest = EquipmentRequest | RoomRequest;
 
 const RequestsPage: React.FC = () => {
@@ -68,8 +65,11 @@ const RequestsPage: React.FC = () => {
     const areasMap = useMemo(() => new Map(areas.map(area => [area.id, area.name])), [areas]);
     
     const getAreaId = (req: AnyRequest) => {
-        if ('requestedItems' in req) return req.requestedItems[0]?.areaId;
-        if ('requestedRoom' in req) return req.requestedRoom.areaId;
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
+        if ('roomTypeId' in req) {
+             const roomType = areas.find(area => area.id === req.roomTypeId);
+             return roomType ? roomType.id : '';
+        }
         return '';
     };
 
@@ -78,25 +78,21 @@ const RequestsPage: React.FC = () => {
         const isSuperAdmin = user?.role === 'superadmin';
         
         let processedRequests = requests.filter(r => 
-            (r.status === 'For Approval') &&
+            (r.status === 'Pending Approval') &&
             (isSuperAdmin || managedIds.has(getAreaId(r) || ''))
         );
 
-        // Filter by area
         if (areaFilter !== 'all') {
             processedRequests = processedRequests.filter(r => getAreaId(r) === areaFilter);
         }
     
-        // Filter by search query
         if (searchQuery.trim() !== '') {
             processedRequests = processedRequests.filter(r => r.userName.toLowerCase().includes(searchQuery.toLowerCase()));
         }
     
-        // Sort
         processedRequests.sort((a, b) => {
             const dateA = new Date(a.requestedStartDate).getTime();
             const dateB = new Date(b.requestedStartDate).getTime();
-            // FIX: Corrected a typo in the sort logic where 'b' (an object) was used instead of 'dateB' (a number).
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
 
@@ -123,22 +119,26 @@ const RequestsPage: React.FC = () => {
         }
     };
 
-    const handleAction = async (ids: string[], action: 'Approved' | 'Rejected') => {
+    const handleAction = async (ids: string[], action: 'approve' | 'reject') => {
         if (ids.length === 0) return;
         
         try {
             const equipmentIds = ids.filter(id => requests.find(r => r.id === id && 'requestedItems' in r));
-            const roomIds = ids.filter(id => requests.find(r => r.id === id && 'requestedRoom' in r));
+            const roomIds = ids.filter(id => requests.find(r => r.id === id && 'roomTypeId' in r));
 
-            if (equipmentIds.length > 0) await updateEquipmentRequestStatusApi(equipmentIds, action === 'Approved' ? 'Ready for Pickup' : 'Rejected');
-            if (roomIds.length > 0) await updateRoomRequestStatusApi(roomIds, action === 'Approved' ? 'Ready for Check-in' : 'Rejected');
+            if (equipmentIds.length > 0) {
+                await updateEquipmentRequestStatusApi(equipmentIds, action === 'approve' ? 'Approved' : 'Rejected');
+            }
+            if (roomIds.length > 0) {
+                await updateRoomRequestStatusApi(roomIds, action === 'approve' ? 'Approved' : 'Rejected');
+            }
 
-            setActionMessage(`Successfully ${action.toLowerCase()} ${ids.length} request(s).`);
+            setActionMessage(`Successfully ${action}d ${ids.length} request(s).`);
             setTimeout(() => setActionMessage(''), 3000);
-            setSelectedRequestIds(new Set()); // Clear selection
-            fetchData(); // Refresh data
+            setSelectedRequestIds(new Set());
+            fetchData();
         } catch (err) {
-            setError(`Failed to ${action.toLowerCase()} requests.`);
+            setError(`Failed to ${action} requests.`);
         }
     };
     
@@ -244,8 +244,8 @@ const RequestsPage: React.FC = () => {
                         selectedIds={selectedRequestIds}
                         onSelectionChange={handleSelectionChange}
                         onSelectAll={handleSelectAll}
-                        onApprove={ids => handleAction(ids, 'Approved')}
-                        onReject={ids => handleAction(ids, 'Rejected')}
+                        onApprove={ids => handleAction(ids, 'approve')}
+                        onReject={ids => handleAction(ids, 'reject')}
                         onRowClick={handleViewDetails}
                     />
                 </div>

@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Area, EquipmentRequest, RoomRequest, Penalty, AllEquipmentRequestStatuses, AllRoomRequestStatuses } from '../types';
+import { Area, EquipmentRequest, RoomRequest, Penalty, AllEquipmentRequestStatuses, AllRoomRequestStatuses, EquipmentRequestStatus, RoomRequestStatus } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { getEquipmentRequestsByUserIdApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getRoomRequestsByUserIdApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
 import { getPenaltiesByUserIdApi } from '../../backend/api/penalties';
 import { Button } from '../components/ui/Button';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, isBefore, isAfter, isWithinInterval } from 'date-fns';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { SearchIcon, ClockIcon, XIcon } from '../components/Icons';
@@ -46,9 +46,9 @@ const RequestsTable: React.FC<{
     resourceType: 'equipment' | 'room';
 }> = ({ requests, onCancel, onRowClick, areasMap, resourceType }) => {
     
-    const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : req.requestedRoom.name;
+    const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
     const getAreaName = (req: AnyRequest) => {
-        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : req.requestedRoom.areaId;
+        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : ('requestedRoom' in req ? req.requestedRoom.areaId : '');
         return areasMap.get(areaId) || 'Unknown Area';
     };
     const getDateTimeString = (req: AnyRequest) => {
@@ -57,12 +57,12 @@ const RequestsTable: React.FC<{
             const end = format(new Date(req.requestedEndDate + 'T00:00:00Z'), 'MMM d, yyyy');
             return start === end ? start : `${start} to ${end}`;
         } else {
-            return `${start} at ${req.requestedStartTime} - ${req.requestedEndTime}`;
+            return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
         }
     };
     const canCancel = (req: AnyRequest) => {
-        const cancellableEquipmentStatuses = ['For Approval', 'Pending Confirmation', 'Ready for Pickup'];
-        const cancellableRoomStatuses = ['For Approval', 'Pending Confirmation', 'Ready for Check-in'];
+        const cancellableEquipmentStatuses: EquipmentRequestStatus[] = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Ready for Pickup'];
+        const cancellableRoomStatuses: RoomRequestStatus[] = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Ready for Check-in'];
         return 'requestedItems' in req ? cancellableEquipmentStatuses.includes(req.status) : cancellableRoomStatuses.includes(req.status);
     };
 
@@ -115,7 +115,7 @@ const PenaltyHistoryList: React.FC<{ penalties: Penalty[], requests: (EquipmentR
     }
 
     const getRequestPurpose = (penalty: Penalty) => {
-        const req = requests.find(r => r.id === (penalty.equipmentRequestId || penalty.roomRequestId));
+        const req = requests.find(r => r.id === (penalty.requestId));
         return req?.purpose || 'General Penalty';
     };
 
@@ -153,6 +153,7 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'equipment' | 'room'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -182,6 +183,14 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
             filtered = filtered.filter(req => (typeFilter === 'equipment') === ('requestedItems' in req));
         }
 
+        if (statusFilter !== 'all') {
+             if (statusFilter === 'completed') {
+                 filtered = filtered.filter(req => ['Returned', 'Completed', 'Closed'].includes(req.status));
+             } else if (statusFilter === 'cancelled') {
+                 filtered = filtered.filter(req => ['Cancelled', 'Rejected'].includes(req.status));
+             }
+        }
+
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(req => 
@@ -191,19 +200,19 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
         }
 
         return filtered.sort((a, b) => new Date(b.dateFiled).getTime() - new Date(a.dateFiled).getTime());
-    }, [allRequests, searchQuery, typeFilter]);
+    }, [allRequests, searchQuery, typeFilter, statusFilter]);
 
     return (
          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center flex-shrink-0">
-                    <h2 className="text-xl font-bold">Complete Request History</h2>
+                    <h2 className="text-xl font-bold dark:text-white">Complete Request History</h2>
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
                         <XIcon className="w-6 h-6" />
                     </button>
                 </div>
                 <div className="p-4 flex-shrink-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                          <Input
                             placeholder="Search by purpose or item name..."
                             value={searchQuery}
@@ -217,6 +226,15 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
                                 { value: 'all', label: 'All Types' },
                                 { value: 'equipment', label: 'Equipment' },
                                 { value: 'room', label: 'Rooms' },
+                            ]}
+                        />
+                         <Select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                            options={[
+                                { value: 'all', label: 'All Statuses' },
+                                { value: 'completed', label: 'Completed/Returned' },
+                                { value: 'cancelled', label: 'Cancelled/Rejected' },
                             ]}
                         />
                     </div>
@@ -272,7 +290,6 @@ const MyReservationsPage: React.FC = () => {
     const [error, setError] = useState('');
     
     const [mainTab, setMainTab] = useState<'equipment' | 'rooms' | 'accountability'>('equipment');
-    const [nestedTab, setNestedTab] = useState<'ongoing' | 'upcoming' | 'past' | 'cancelled'>('ongoing');
     
     const [searchQuery, setSearchQuery] = useState('');
     const [areaFilter, setAreaFilter] = useState('all');
@@ -312,108 +329,32 @@ const MyReservationsPage: React.FC = () => {
 
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
-    const categorizedEq = useMemo(() => {
-        let filteredRequests = equipmentRequests;
+    const activeRequests = useMemo(() => {
+        const activeEq = equipmentRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
+        const activeRooms = roomRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
+        
+        let filtered = mainTab === 'equipment' ? activeEq : activeRooms;
 
         if (statusFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.status === statusFilter);
+            filtered = filtered.filter(req => req.status === statusFilter);
         }
         if (areaFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.requestedItems.some(item => item.areaId === areaFilter));
+            filtered = filtered.filter(req => ('requestedItems' in req ? req.requestedItems.some(item => item.areaId === areaFilter) : (req as RoomRequest).requestedRoom.areaId === areaFilter));
         }
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
-            filteredRequests = filteredRequests.filter(req => 
+            filtered = filtered.filter(req => 
                 req.purpose.toLowerCase().includes(lowercasedQuery) ||
-                req.requestedItems.some(item => item.name.toLowerCase().includes(lowercasedQuery))
-            );
-        }
-        
-        const upcoming: EquipmentRequest[] = [];
-        const ongoing: EquipmentRequest[] = [];
-        const past: EquipmentRequest[] = [];
-        const cancelled: EquipmentRequest[] = [];
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        filteredRequests.forEach(r => {
-            if (r.status === 'Cancelled' || r.status === 'Rejected') { cancelled.push(r); return; }
-            if (r.status === 'Closed') { past.push(r); return; }
-            if (r.requestedEndDate < todayStr) { past.push(r); return; }
-            if (r.status === 'For Approval' || r.status === 'Pending Confirmation') { ongoing.push(r); return; }
-            
-            const isToday = todayStr >= r.requestedStartDate && todayStr <= r.requestedEndDate;
-            const isFuture = r.requestedStartDate > todayStr;
-            
-            if (r.status === 'Ready for Pickup') {
-                if (isToday) ongoing.push(r);
-                else if (isFuture) upcoming.push(r);
-                else past.push(r);
-            }
-        });
-
-        const dateSorter = (a: EquipmentRequest, b: EquipmentRequest) => {
-            const dateA = new Date(a.dateFiled).getTime();
-            const dateB = new Date(b.dateFiled).getTime();
-            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-        };
-
-        ongoing.sort(dateSorter);
-        upcoming.sort(dateSorter);
-        past.sort(dateSorter);
-        cancelled.sort(dateSorter);
-        
-        return { upcoming, ongoing, past, cancelled };
-    }, [equipmentRequests, searchQuery, areaFilter, statusFilter, sortOrder]);
-
-    const categorizedRooms = useMemo(() => {
-        let filteredRequests = roomRequests;
-        if (statusFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.status === statusFilter);
-        }
-        if (areaFilter !== 'all') {
-            filteredRequests = filteredRequests.filter(req => req.requestedRoom.areaId === areaFilter);
-        }
-        if (searchQuery.trim() !== '') {
-            const lowercasedQuery = searchQuery.toLowerCase();
-            filteredRequests = filteredRequests.filter(req => 
-                req.purpose.toLowerCase().includes(lowercasedQuery) ||
-                req.requestedRoom.name.toLowerCase().includes(lowercasedQuery)
+                ('requestedItems' in req ? req.requestedItems.some(item => item.name.toLowerCase().includes(lowercasedQuery)) : (req as RoomRequest).requestedRoom.name.toLowerCase().includes(lowercasedQuery))
             );
         }
 
-        const upcoming: RoomRequest[] = [];
-        const ongoing: RoomRequest[] = [];
-        const past: RoomRequest[] = [];
-        const cancelled: RoomRequest[] = [];
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        filteredRequests.forEach(r => {
-            if (r.status === 'Cancelled' || r.status === 'Rejected') { cancelled.push(r); return; }
-            if (r.status === 'Closed') { past.push(r); return; }
-            if (r.requestedStartDate < todayStr) { past.push(r); return; }
-            if (r.status === 'For Approval' || r.status === 'Pending Confirmation') { ongoing.push(r); return; }
-
-            const isToday = r.requestedStartDate === todayStr;
-            const isFuture = r.requestedStartDate > todayStr;
-
-            if (r.status === 'Ready for Check-in' || r.status === 'Overdue') {
-                if (isToday) ongoing.push(r);
-                else if (isFuture) upcoming.push(r);
-            }
-        });
-
-        const dateSorter = (a: RoomRequest, b: RoomRequest) => {
+        return filtered.sort((a, b) => {
             const dateA = new Date(a.dateFiled).getTime();
             const dateB = new Date(b.dateFiled).getTime();
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-        };
-        
-        ongoing.sort(dateSorter);
-        upcoming.sort(dateSorter);
-        past.sort(dateSorter);
-        cancelled.sort(dateSorter);
-        return { upcoming, ongoing, past, cancelled };
-    }, [roomRequests, searchQuery, areaFilter, statusFilter, sortOrder]);
+        });
+    }, [equipmentRequests, roomRequests, mainTab, searchQuery, areaFilter, statusFilter, sortOrder]);
     
     const handleConfirmCancel = async () => {
         if (!requestToCancel) return;
@@ -439,24 +380,22 @@ const MyReservationsPage: React.FC = () => {
 
     const statusFilterOptions = useMemo(() => {
         const allStatuses = mainTab === 'equipment' ? AllEquipmentRequestStatuses : AllRoomRequestStatuses;
+        // Filter out completed/cancelled statuses from the active view filter options
+        const activeStatuses = allStatuses.filter(s => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(s));
+        
         return [
-            { label: 'All Statuses', value: 'all' },
-            ...[...allStatuses].sort((a: string, b: string) => a.localeCompare(b)).map(s => ({ label: s, value: s }))
+            { label: 'All Active Statuses', value: 'all' },
+            ...[...activeStatuses].sort((a: string, b: string) => a.localeCompare(b)).map(s => ({ label: s, value: s }))
         ];
     }, [mainTab]);
 
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
     
-    const nestedTabActiveClasses = 'bg-up-maroon-50 text-up-maroon-800 border border-up-maroon-200 dark:bg-up-maroon-900/30 dark:text-up-maroon-300 dark:border-up-maroon-800';
-    const nestedTabInactiveClasses = 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700';
-    
-    const renderEmptyState = (tab: string, resource: string, hasOriginalData: boolean) => (
+    const renderEmptyState = (tab: string, resource: string) => (
          <p className="text-slate-500 dark:text-slate-400 text-center py-4">
-            {hasOriginalData 
-                ? `No ${resource} requests match your current filters in the '${tab}' tab.`
-                : `You have no ${tab} ${resource} requests.`
-            }
+            You have no active {resource} reservations matching your filters.
+            <br/><span className="text-xs">Check "History" for completed or cancelled requests.</span>
         </p>
     );
 
@@ -544,29 +483,18 @@ const MyReservationsPage: React.FC = () => {
             
             {!isLoading && !error && (
                 <div>
-                    {(mainTab === 'equipment' || mainTab === 'rooms') && (
-                        <div className="flex space-x-2 mb-4 p-1 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
-                            <button onClick={() => setNestedTab('ongoing')} className={`w-full py-2 px-4 text-sm font-semibold rounded-md transition-colors ${nestedTab === 'ongoing' ? nestedTabActiveClasses : nestedTabInactiveClasses}`}>Ongoing</button>
-                            <button onClick={() => setNestedTab('upcoming')} className={`w-full py-2 px-4 text-sm font-semibold rounded-md transition-colors ${nestedTab === 'upcoming' ? nestedTabActiveClasses : nestedTabInactiveClasses}`}>Upcoming</button>
-                            <button onClick={() => setNestedTab('past')} className={`w-full py-2 px-4 text-sm font-semibold rounded-md transition-colors ${nestedTab === 'past' ? nestedTabActiveClasses : nestedTabInactiveClasses}`}>Past</button>
-                            <button onClick={() => setNestedTab('cancelled')} className={`w-full py-2 px-4 text-sm font-semibold rounded-md transition-colors ${nestedTab === 'cancelled' ? nestedTabActiveClasses : nestedTabInactiveClasses}`}>Cancelled</button>
-                        </div>
-                    )}
-                    
                     {mainTab === 'equipment' && (
                         <div className="space-y-4">
-                           {nestedTab === 'ongoing' && (categorizedEq.ongoing.length > 0 ? <RequestsTable requests={categorizedEq.ongoing} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('ongoing', 'equipment', equipmentRequests.length > 0))}
-                           {nestedTab === 'upcoming' && (categorizedEq.upcoming.length > 0 ? <RequestsTable requests={categorizedEq.upcoming} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('upcoming', 'equipment', equipmentRequests.length > 0))}
-                           {nestedTab === 'past' && (categorizedEq.past.length > 0 ? <RequestsTable requests={categorizedEq.past} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('past', 'equipment', equipmentRequests.length > 0))}
-                           {nestedTab === 'cancelled' && (categorizedEq.cancelled.length > 0 ? <RequestsTable requests={categorizedEq.cancelled} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('cancelled', 'equipment', equipmentRequests.length > 0))}
+                           {activeRequests.length > 0 ? (
+                               <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" />
+                           ) : renderEmptyState('Active', 'equipment')}
                         </div>
                     )}
                     {mainTab === 'rooms' && (
                          <div className="space-y-4">
-                           {nestedTab === 'ongoing' && (categorizedRooms.ongoing.length > 0 ? <RequestsTable requests={categorizedRooms.ongoing} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('ongoing', 'room', roomRequests.length > 0))}
-                           {nestedTab === 'upcoming' && (categorizedRooms.upcoming.length > 0 ? <RequestsTable requests={categorizedRooms.upcoming} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('upcoming', 'room', roomRequests.length > 0))}
-                           {nestedTab === 'past' && (categorizedRooms.past.length > 0 ? <RequestsTable requests={categorizedRooms.past} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('past', 'room', roomRequests.length > 0))}
-                           {nestedTab === 'cancelled' && (categorizedRooms.cancelled.length > 0 ? <RequestsTable requests={categorizedRooms.cancelled} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('cancelled', 'room', roomRequests.length > 0))}
+                           {activeRequests.length > 0 ? (
+                               <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" />
+                           ) : renderEmptyState('Active', 'room')}
                         </div>
                     )}
                     {mainTab === 'accountability' && <PenaltyHistoryList penalties={penalties} requests={[...equipmentRequests, ...roomRequests]} />}

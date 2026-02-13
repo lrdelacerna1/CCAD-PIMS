@@ -69,8 +69,8 @@ export const EquipmentRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
         
-        const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'superadmin');
-        const initialStatus: EquipmentRequestStatus = isAdminRequest ? 'Pending Approval' : 'Pending Endorsement';
+        const isStudent = requestingUser && requestingUser.role === 'student';
+        const initialStatus: EquipmentRequestStatus = isStudent ? 'Pending Endorsement' : 'Pending Approval';
 
         const newRequestData = {
             ...data,
