@@ -20,6 +20,10 @@ export interface Area {
     id: string;
     name: string;
     description: string;
+    penaltySettings?: {
+        penaltyAmount: number;
+        penaltyInterval: 'per_day' | 'per_hour';
+    };
 }
 
 // --- INVENTORY & EQUIPMENT --- //

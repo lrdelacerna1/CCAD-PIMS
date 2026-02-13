@@ -11,7 +11,7 @@ const AdminDashboardPage: React.FC = () => {
     return (
         <div className="container mx-auto p-6">
              <h1 className="text-3xl font-bold dark:text-white mb-6">
-                {isSuperAdmin ? 'Areas & Admins' : 'Admin Dashboard'}
+                {isSuperAdmin ? 'Areas and Administrators' : 'Admin Dashboard'}
             </h1>
             {isSuperAdmin && <SuperAdminDashboard />}
             {user?.role === 'admin' && <StandardAdminDashboard />}

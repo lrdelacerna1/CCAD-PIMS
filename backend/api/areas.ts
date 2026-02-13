@@ -14,13 +14,18 @@ export const getAreasApi = async (): Promise<Area[]> => {
     return simulateNetworkDelay(areas);
 };
 
+export const getAreaByIdApi = async (id: string): Promise<Area> => {
+    const area = await AreaService.getAreaById(id);
+    return simulateNetworkDelay(area);
+}
+
 export const createAreaApi = async (name: string): Promise<Area> => {
     const newArea = await AreaService.createArea(name);
     return simulateNetworkDelay(newArea);
 };
 
-export const updateAreaApi = async (id: string, name: string): Promise<Area> => {
-    const updatedArea = await AreaService.updateArea(id, name);
+export const updateAreaApi = async (id: string, areaData: Partial<Area>): Promise<Area> => {
+    const updatedArea = await AreaService.updateArea(id, areaData);
     return simulateNetworkDelay(updatedArea);
 };
 

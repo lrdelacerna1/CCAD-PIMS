@@ -131,9 +131,14 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                             <div className={dropdownContainerClass}>
                                 <NavLink to="/all-requests" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Reservations</NavLink>
                                 <NavLink to="/inventory" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Inventory Management</NavLink>
-                                <NavLink to="/admin" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>
-                                    Areas & Administrators
-                                </NavLink>
+                                {isAdmin && !isSuperAdmin && (
+                                    <NavLink to="/settings" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Area Settings</NavLink>
+                                )}
+                                {isSuperAdmin && (
+                                    <NavLink to="/admin" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>
+                                        Areas and Administrators
+                                    </NavLink>
+                                )}
                             </div>
                         )}
                   </div>
@@ -230,9 +235,14 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Management</div>
                     <NavLink to="/all-requests" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Reservations</NavLink>
                     <NavLink to="/inventory" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Inventory Management</NavLink>
-                    <NavLink to="/admin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>
-                      Areas & Administrators
-                    </NavLink>
+                    {isAdmin && !isSuperAdmin && (
+                        <NavLink to="/settings" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Area Settings</NavLink>
+                    )}
+                    {isSuperAdmin && (
+                         <NavLink to="/admin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>
+                            Areas and Administrators
+                        </NavLink>
+                    )}
                   </>
                 )}
 

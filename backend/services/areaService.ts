@@ -8,7 +8,8 @@ import {
     doc, 
     query, 
     where, 
-    writeBatch 
+    writeBatch,
+    getDoc
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { Area } from "../../frontend/types";
@@ -26,6 +27,15 @@ export class AreaService {
         return areas;
     }
 
+    static async getAreaById(id: string): Promise<Area> {
+        const areaRef = doc(db, "areas", id);
+        const docSnap = await getDoc(areaRef);
+        if (!docSnap.exists()) {
+            throw new Error("Area not found");
+        }
+        return { id: docSnap.id, ...docSnap.data() } as Area;
+    }
+
     static async createArea(name: string): Promise<Area> {
         const q = query(areasCollection, where("name", "==", name));
         const querySnapshot = await getDocs(q);
@@ -33,22 +43,30 @@ export class AreaService {
             throw new Error(`Area with name "${name}" already exists.`);
         }
 
-        const docRef = await addDoc(areasCollection, { name });
-        return { id: docRef.id, name };
+        const newArea: Omit<Area, 'id'> = {
+            name,
+            description: '',
+            penaltySettings: { penaltyAmount: 0, penaltyInterval: 'per_day' },
+        };
+
+        const docRef = await addDoc(areasCollection, newArea);
+        return { id: docRef.id, ...newArea };
     }
 
-    static async updateArea(id: string, name: string): Promise<Area> {
+    static async updateArea(id: string, areaData: Partial<Area>): Promise<Area> {
         const areaRef = doc(db, "areas", id);
 
         // Check for name collision before updating
-        const q = query(areasCollection, where("name", "==", name));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty && querySnapshot.docs[0].id !== id) {
-            throw new Error(`Area with name "${name}" already exists.`);
+        if (areaData.name) {
+            const q = query(areasCollection, where("name", "==", areaData.name));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty && querySnapshot.docs[0].id !== id) {
+                throw new Error(`Area with name "${areaData.name}" already exists.`);
+            }
         }
 
-        await updateDoc(areaRef, { name });
-        return { id, name };
+        await updateDoc(areaRef, areaData);
+        return { id, ...areaData } as Area;
     }
 
     static async deleteArea(id: string): Promise<void> {

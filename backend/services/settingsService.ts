@@ -1,30 +1,28 @@
 
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { ReservationSettings } from "../../frontend/types";
+import { SystemSettings } from "../../frontend/types";
 
-const SETTINGS_DOC_ID = "reservation_settings";
+const settingsDocRef = doc(db, "settings", "main");
 
-export class SettingsService {
-    static async getSettings(): Promise<ReservationSettings> {
-        const settingsRef = doc(db, "settings", SETTINGS_DOC_ID);
-        const settingsDoc = await getDoc(settingsRef);
-        
-        if (settingsDoc.exists()) {
-            return settingsDoc.data() as ReservationSettings;
+export const SettingsService = {
+    async getSettings(): Promise<SystemSettings> {
+        const docSnap = await getDoc(settingsDocRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as SystemSettings;
         } else {
-            // Return default settings if the document doesn't exist
-            return {
-                minimumLeadDays: 2,
-                penaltyAmount: 10,
-                penaltyInterval: 'per_day',
+            // If no settings exist, create with default values
+            const defaultSettings: SystemSettings = {
+                penaltyAmount: 50,
+                penaltyInterval: 'daily',
+                // Add other default settings here
             };
+            await setDoc(settingsDocRef, defaultSettings);
+            return defaultSettings;
         }
+    },
+
+    async updateSettings(settings: Partial<SystemSettings>): Promise<void> {
+        await updateDoc(settingsDocRef, settings);
     }
-    
-    static async updateSettings(newSettings: Partial<ReservationSettings>): Promise<ReservationSettings> {
-        const settingsRef = doc(db, "settings", SETTINGS_DOC_ID);
-        await setDoc(settingsRef, newSettings, { merge: true });
-        return this.getSettings();
-    }
-}
+};
