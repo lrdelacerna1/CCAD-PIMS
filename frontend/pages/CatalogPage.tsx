@@ -27,9 +27,14 @@ const CatalogPage: React.FC = () => {
     const [error, setError] = useState('');
     const [settings, setSettings] = useState<ReservationSettings | null>(null);
 
-    const today = new Date().toISOString().split('T')[0];
-    const [startDate, setStartDate] = useState(today);
-    const [endDate, setEndDate] = useState(today);
+    const minDate = useMemo(() => {
+        const date = new Date();
+        date.setDate(date.getDate() + 2);
+        return date.toISOString().split('T')[0];
+    }, []);
+
+    const [startDate, setStartDate] = useState(minDate);
+    const [endDate, setEndDate] = useState(minDate);
 
     const [equipmentCart, setEquipmentCart] = useState<Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>>(new Map());
     const [roomCart, setRoomCart] = useState<{ type: RoomTypeForCatalog, instance: RoomInstance } | null>(null);
@@ -192,7 +197,7 @@ useEffect(() => {
                     endDate={endDate}
                     onStartDateChange={setStartDate}
                     onEndDateChange={setEndDate}
-                    minDate={today}
+                    minDate={minDate}
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                     onClose={() => setIsMobileCartOpen(false)}
