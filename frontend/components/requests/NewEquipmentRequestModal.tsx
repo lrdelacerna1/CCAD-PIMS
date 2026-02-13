@@ -36,6 +36,8 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
     const [requestItems, setRequestItems] = useState<Map<string, EquipmentCartInstanceEntry>>(items);
     const [currentStartDate, setCurrentStartDate] = useState(startDate);
     const [currentEndDate, setCurrentEndDate] = useState(endDate);
+    const [requestedStartTime, setRequestedStartTime] = useState('08:00');
+    const [requestedEndTime, setRequestedEndTime] = useState('17:00');
 
     const [purpose, setPurpose] = useState('');
     const [secondaryContactName, setSecondaryContactName] = useState('');
@@ -160,9 +162,9 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
         if (user.role === 'student' || user.role === 'guest') {
-            if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
-            if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
-            if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
+            if (!endorserName.trim()) { setError("Endorser\\'s name is required."); return; }
+            if (!endorserPosition.trim()) { setError("Endorser\\'s position is required."); return; }
+            if (!endorserEmail.trim()) { setError("Endorser\\'s email is required."); return; }
         }
         if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
         if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
@@ -182,8 +184,8 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 userName: `${user.firstName} ${user.lastName}`,
                 userContact: user.emailAddress,
                 purpose,
-                requestedStartDate: currentStartDate,
-                requestedEndDate: currentEndDate,
+                requestedStartDate: `${currentStartDate}T${requestedStartTime}`,
+                requestedEndDate: `${currentEndDate}T${requestedEndTime}`,
                 secondaryContactName,
                 secondaryContactNumber,
                 requestedItems: requestedItemsPayload,
@@ -252,6 +254,10 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 required 
                             />
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input label="Start Time" id="start-time" type="time" value={requestedStartTime} onChange={e => setRequestedStartTime(e.target.value)} required />
+                            <Input label="End Time" id="end-time" type="time" value={requestedEndTime} onChange={e => setRequestedEndTime(e.target.value)} required />
+                        </div>
                         
                         {items.size === 0 && (
                             <>
@@ -317,7 +323,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
                                     <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
                                     <Input 
-                                        label="Endorser's Name (Faculty/Advisor)"
+                                        label="Endorser\\'s Name (Faculty/Advisor)"
                                         id="endorser-name"
                                         type="text"
                                         value={endorserName}
@@ -326,7 +332,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         required
                                     />
                                     <Input 
-                                        label="Endorser's Position"
+                                        label="Endorser\\'s Position"
                                         id="endorser-position"
                                         type="text"
                                         value={endorserPosition}
@@ -335,7 +341,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         required
                                     />
                                     <Input 
-                                        label="Endorser's Email"
+                                        label="Endorser\\'s Email"
                                         id="endorser-email"
                                         type="email"
                                         value={endorserEmail}
@@ -369,7 +375,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                         </div>
                     </div>
 
-                    <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
+                    <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
                         <Button type="button" onClick={onClose} className="!w-auto" variant="secondary">Cancel</Button>
                         <Button type="submit" isLoading={isLoading} className="!w-auto">Submit Request</Button>
                     </div>
