@@ -79,11 +79,11 @@ const RequestSummary: React.FC<RequestSummaryProps> = ({ equipmentRequests, room
         <Card className="!max-w-none !p-0 h-full flex flex-col border-t-4 border-t-up-maroon-700">
             <div className="p-4 border-b dark:border-slate-700">
                  <h2 className="text-xl font-semibold dark:text-white mb-4 font-heading">Request Summary</h2>
-                 <div className="flex space-x-2 p-1 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
-                    <button onClick={() => setActiveTab('equipment')} className={`flex-1 whitespace-nowrap py-2 px-4 text-sm font-semibold rounded-md transition-colors ${activeTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}>
+                 <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
+                    <button onClick={() => setActiveTab('equipment')} className={`w-full rounded-md py-2 px-2 text-sm font-semibold transition-colors ${activeTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}>
                         Equipment
                     </button>
-                    <button onClick={() => setActiveTab('rooms')} className={`flex-1 whitespace-nowrap py-2 px-4 text-sm font-semibold rounded-md transition-colors ${activeTab === 'rooms' ? activeTabClasses : inactiveTabClasses}`}>
+                    <button onClick={() => setActiveTab('rooms')} className={`w-full rounded-md py-2 px-2 text-sm font-semibold transition-colors ${activeTab === 'rooms' ? activeTabClasses : inactiveTabClasses}`}>
                         Rooms
                     </button>
                 </div>
