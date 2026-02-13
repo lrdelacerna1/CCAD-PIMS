@@ -8,7 +8,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Checkbox } from '../ui/Checkbox';
-import { InformationCircleIcon, XIcon, MailIcon, UserIcon } from '../Icons';
+import { InformationCircleIcon, XIcon, MailIcon, UserIcon, BriefcaseIcon, PhoneIcon } from '../Icons';
 import { Select } from '../ui/Select';
 
 interface EquipmentCartInstanceEntry {
@@ -216,7 +216,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         .filter(({ instance }) => !requestItems.has(instance.id))
         .map(({ instance, item }) => ({
             value: instance.id,
-            label: `${item.name} (AT: ${instance.assetTag})`
+            label: `${item.name} (Asset Tag: ${instance.assetTag})`
         }));
         
     const cartEntries = Array.from(requestItems.values());
@@ -341,6 +341,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         value={endorserPosition}
                                         onChange={e => setEndorserPosition(e.target.value)}
                                         placeholder="e.g., Professor, Department Chair"
+                                        icon={<BriefcaseIcon className="w-5 h-5"/>}
                                         required
                                     />
                                     <Input 
@@ -355,13 +356,21 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 </div>
                             )}
                             <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200 pt-4 border-t dark:border-slate-600">Secondary Contact</h4>
-                            <Input label="Name" id="secondary-name" value={secondaryContactName} onChange={e => setSecondaryContactName(e.target.value)} required />
+                            <Input 
+                                label="Name" 
+                                id="secondary-name" 
+                                value={secondaryContactName} 
+                                onChange={e => setSecondaryContactName(e.target.value)} 
+                                icon={<UserIcon className="w-5 h-5"/>} 
+                                required 
+                            />
                             <Input 
                                 label="Contact Number" 
                                 id="secondary-number" 
                                 value={secondaryContactNumber} 
                                 onChange={handleContactNumberChange}
                                 type="tel" 
+                                icon={<PhoneIcon className="w-5 h-5"/>} 
                                 required 
                             />
                         </div>

@@ -9,7 +9,7 @@ import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Checkbox } from '../ui/Checkbox';
 import { Select } from '../ui/Select';
-import { InformationCircleIcon, MailIcon, UserIcon } from '../Icons';
+import { InformationCircleIcon, MailIcon, UserIcon, BriefcaseIcon } from '../Icons';
 
 interface NewRoomRequestModalProps {
     areas: Area[];
@@ -275,6 +275,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
                                         value={endorserPosition}
                                         onChange={e => setEndorserPosition(e.target.value)}
                                         placeholder="e.g., Professor, Department Chair"
+                                        icon={<BriefcaseIcon className="w-5 h-5"/>}
                                         required
                                     />
                                     <Input 
