@@ -200,8 +200,8 @@ const AddInstanceModal: React.FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.serialNumber.trim()) {
-            setError('Serial number is required.');
+        if (!formData.assetTag.trim()) {
+            setError('Asset Tag is required.');
             return;
         }
         setIsLoading(true);
@@ -246,9 +246,9 @@ const AddInstanceModal: React.FC<{
                         </div>
                         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
                         <div className="space-y-4">
-                            <Input label="Serial Number" id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} required />
+                             <Input label="Asset Tag" id="assetTag" name="assetTag" value={formData.assetTag} onChange={handleInputChange} required />
+                             <Input label="Serial Number (Optional)" id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} />
                             <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
-                             <Input label="Asset Tag (Optional)" id="assetTag" name="assetTag" value={formData.assetTag} onChange={handleInputChange} />
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Purchase Date (Optional)" id="purchaseDate" name="purchaseDate" type="date" value={formData.purchaseDate} onChange={handleInputChange} />
                                 <Input label="Warranty End Date (Optional)" id="warrantyEndDate" name="warrantyEndDate" type="date" value={formData.warrantyEndDate} onChange={handleInputChange} />
@@ -382,7 +382,7 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                 <div className="p-6">
                     <div className="flex justify-between items-center border-b pb-3 mb-4 dark:border-slate-600">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{instance.serialNumber}</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{instance.assetTag}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{item.name}</p>
                         </div>
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none">&times;</button>
@@ -400,9 +400,9 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                 <div className="px-6 pb-6 overflow-y-auto flex-grow">
                     {activeTab === 'details' && (
                         <div className="space-y-4">
-                            <Input label="Serial Number" id="serialNumber" name="serialNumber" value={editedInstance.serialNumber} onChange={handleInputChange} required />
+                            <Input label="Asset Tag" id="assetTag" name="assetTag" value={editedInstance.assetTag || ''} onChange={handleInputChange} required />
+                            <Input label="Serial Number" id="serialNumber" name="serialNumber" value={editedInstance.serialNumber || ''} onChange={handleInputChange} />
                             <Select label="Condition" id="condition" name="condition" value={editedInstance.condition} onChange={handleInputChange} options={['Good', 'Damaged', 'Lost/Unusable'].map(c => ({ value: c, label: c }))} />
-                            <Input label="Asset Tag" id="assetTag" name="assetTag" value={editedInstance.assetTag || ''} onChange={handleInputChange} />
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Purchase Date" id="purchaseDate" name="purchaseDate" type="date" value={editedInstance.purchaseDate || ''} onChange={handleInputChange} />
                                 <Input label="Warranty End Date" id="warrantyEndDate" name="warrantyEndDate" type="date" value={editedInstance.warrantyEndDate || ''} onChange={handleInputChange} />
@@ -551,7 +551,7 @@ const AvailabilityCheckModal: React.FC<{
                                         <h4 className="text-sm font-semibold dark:text-gray-300 mb-2">Available for the entire period:</h4>
                                         {result.availableInstances.length > 0 ? (
                                             <ul className="space-y-1">
-                                                {result.availableInstances.map((inst: any) => <li key={inst.id} className="text-sm p-2 bg-green-50 dark:bg-green-900/50 rounded">{inst.serialNumber} - {inst.condition}</li>)}
+                                                {result.availableInstances.map((inst: any) => <li key={inst.id} className="text-sm p-2 bg-green-50 dark:bg-green-900/50 rounded">{inst.assetTag} - {inst.condition}</li>)}
                                             </ul>
                                         ) : <p className="text-sm p-2 bg-red-50 dark:bg-red-900/50 rounded text-red-700 dark:text-red-300">No single instance is available for the full duration.</p>}
                                     </div>
@@ -773,7 +773,7 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
                         <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-200 dark:bg-slate-800 dark:text-slate-300">
                                 <tr>
-                                    <th scope="col" className="px-4 py-2 rounded-l-md">Serial #</th>
+                                    <th scope="col" className="px-4 py-2 rounded-l-md">Asset Tag</th>
                                     <th scope="col" className="px-4 py-2">Condition</th>
                                     <th scope="col" className="px-4 py-2">Status</th>
                                     <th scope="col" className="px-4 py-2 rounded-r-md text-right">Action</th>
@@ -782,7 +782,7 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
                             <tbody>
                                 {instances.length > 0 ? instances.map(inst => (
                                     <tr key={inst.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer transition-colors" onClick={() => handleViewInstance(inst, item)}>
-                                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{inst.serialNumber}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{inst.assetTag}</td>
                                         <td className="px-4 py-3"><ConditionBadge condition={inst.condition} /></td>
                                         <td className="px-4 py-3"><StatusBadge status={getTodayStatus(inst)} /></td>
                                         <td className="px-4 py-3 text-right"><InstanceActionMenu instance={inst} onEdit={handleEditInstance} onDelete={handleDeleteInstanceClick} /></td>
@@ -861,7 +861,7 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
              {showDeleteInstanceConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteInstanceConfirm(null)}>
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="p-6"><h3 className="text-xl font-bold text-slate-900 dark:text-white">Delete Instance?</h3><p className="text-slate-600 dark:text-slate-300 my-2">Are you sure you want to delete instance <strong>{showDeleteInstanceConfirm.serialNumber}</strong>?</p><p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone.</p></div>
+                        <div className="p-6"><h3 className="text-xl font-bold text-slate-900 dark:text-white">Delete Instance?</h3><p className="text-slate-600 dark:text-slate-300 my-2">Are you sure you want to delete instance <strong>{showDeleteInstanceConfirm.assetTag}</strong>?</p><p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone.</p></div>
                         <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50"><Button onClick={() => setShowDeleteInstanceConfirm(null)} className="!w-auto" variant="secondary">Cancel</Button><Button onClick={handleConfirmDeleteInstance} isLoading={isDeleting} variant="danger" className="!w-auto">Delete</Button></div>
                     </div>
                 </div>

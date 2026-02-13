@@ -48,11 +48,11 @@ export interface InventoryItemWithQuantity extends InventoryItem {
 export interface InventoryInstance {
     id: string;
     itemId: string;
-    serialNumber: string;
+    serialNumber?: string;
     status: InventoryInstanceStatus;
     condition: InventoryInstanceCondition;
     notes?: string;
-    assetTag?: string;
+    assetTag: string;
     purchaseDate?: string;
     warrantyEndDate?: string;
     lastMaintenanceDate?: string;
@@ -64,7 +64,7 @@ export interface InventoryInstance {
 // --- ROOMS --- //
 
 export type RoomStatus = 'Available' | 'Reserved' | 'Under Maintenance';
-export type RoomCondition = 'Newly Renovated' | 'Good' | 'Fair' | 'Poor';
+export type RoomCondition = 'Good' | 'Requires Maintenance' | 'Out of Service';
 
 export interface RoomType {
     id: string;
@@ -165,7 +165,7 @@ export interface AvailabilityResult {
     itemId: string;
     total: number;
     available: number;
-    unavailableInstances: { id: string; serialNumber: string; status: InventoryInstanceStatus }[];
+    unavailableInstances: { id: string; assetTag: string; status: InventoryInstanceStatus }[];
 }
 
 export interface RoomAvailabilityRequest {

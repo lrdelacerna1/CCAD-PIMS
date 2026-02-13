@@ -27,10 +27,9 @@ const RoomStatusBadge: React.FC<{ status: RoomStatus }> = ({ status }) => {
 const RoomConditionBadge: React.FC<{ condition: RoomCondition }> = ({ condition }) => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full capitalize";
     const conditionClasses: { [key in RoomCondition]: string } = {
-        'Newly Renovated': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
         'Good': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-        'Fair': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-        'Poor': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+        'Requires Maintenance': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+        'Out of Service': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
     };
     return <span className={`${baseClasses} ${conditionClasses[condition]}`}>{condition}</span>;
 };
@@ -301,7 +300,7 @@ const AddRoomInstanceModal: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
                         <div className="space-y-4">
                             <Input label="Room Name / Identifier" name="name" id="instance-name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Conference Room A" required />
-                            <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Newly Renovated', 'Good', 'Fair', 'Poor'].map(c => ({ value: c, label: c }))} />
+                            <Select label="Condition" id="condition" name="condition" value={formData.condition} onChange={handleInputChange} options={['Good', 'Requires Maintenance', 'Out of Service'].map(c => ({ value: c, label: c }))} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input label="Capacity (Optional)" name="capacity" id="capacity" type="number" value={formData.capacity} onChange={handleInputChange} placeholder="e.g., 12" />
                             </div>
@@ -458,7 +457,7 @@ const RoomInstanceDetailsModal: React.FC<{ instance: RoomInstance; roomTypeName:
                     {activeTab === 'details' && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Select label="Condition" name="condition" id="room-condition" value={editedInstance.condition} onChange={handleInputChange} options={['Newly Renovated', 'Good', 'Fair', 'Poor'].map(c => ({ value: c, label: c }))} />
+                                <Select label="Condition" name="condition" id="room-condition" value={editedInstance.condition} onChange={handleInputChange} options={['Good', 'Requires Maintenance', 'Out of Service'].map(c => ({ value: c, label: c }))} />
                                 <Input label="Capacity" name="capacity" id="capacity" type="number" value={editedInstance.capacity || ''} onChange={handleInputChange} placeholder="e.g., 12" />
                             </div>
                             <div>

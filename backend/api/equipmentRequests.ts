@@ -1,3 +1,4 @@
+
 import { EquipmentRequest, EquipmentRequestStatus } from '../../frontend/types';
 import { EquipmentRequestService } from '../services/equipmentRequestService';
 
@@ -24,6 +25,6 @@ export const createEquipmentRequestApi = async (data: Omit<EquipmentRequest, 'id
 };
 
 export const updateEquipmentRequestStatusApi = async (ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> => {
-    await EquipmentRequestService.updateStatus(ids, status, rejectionReason);
+    await EquipmentRequestService.updateStatusBatch(ids, status, rejectionReason);
     return simulateNetworkDelay(undefined);
 };

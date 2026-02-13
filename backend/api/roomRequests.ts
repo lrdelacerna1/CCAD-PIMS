@@ -1,3 +1,4 @@
+
 import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
 import { RoomRequestService } from '../services/roomRequestService';
 
@@ -24,6 +25,6 @@ export const createRoomRequestApi = async (data: Omit<RoomRequest, 'id' | 'statu
 };
 
 export const updateRoomRequestStatusApi = async (ids: string[], status: RoomRequestStatus, rejectionReason?: string): Promise<void> => {
-    await RoomRequestService.updateStatus(ids, status, rejectionReason);
+    await RoomRequestService.updateStatusBatch(ids, status, rejectionReason);
     return simulateNetworkDelay(undefined);
 };

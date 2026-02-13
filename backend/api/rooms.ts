@@ -1,5 +1,13 @@
-import { RoomType, RoomInstance, RoomTypeWithQuantity, RoomAvailabilityRequest, RoomInstanceAvailabilityResult, RoomTypeForCatalog } from '../../frontend/types';
+
+import { RoomType, RoomInstance, RoomTypeWithQuantity, RoomAvailabilityRequest, RoomInstanceAvailabilityResult } from '../../frontend/types';
 import { RoomService } from '../services/roomService';
+
+// Define the interface here if it's not exported from frontend/types yet, or ensure frontend/types exports it.
+// Assuming RoomTypeForCatalog is used in frontend/types but might need to be explicitly imported if not default.
+interface RoomTypeForCatalog extends RoomTypeWithQuantity {
+    availabilityStatus: string;
+    availableForDates: number;
+}
 
 export const getRoomTypesApi = async (): Promise<RoomTypeWithQuantity[]> => {
     return RoomService.getRoomTypes();
@@ -9,11 +17,11 @@ export const getRoomCatalogApi = async (startDate: string, endDate: string): Pro
     return RoomService.getRoomTypesForCatalog(startDate, endDate);
 };
 
-export const createRoomTypeApi = async (data: { name: string; areaId: string }): Promise<RoomType> => {
+export const createRoomTypeApi = async (data: { name: string; areaId: string; photoUrl?: string }): Promise<RoomType> => {
     return RoomService.createRoomType(data);
 };
 
-export const updateRoomTypeApi = async (id: string, updates: { name: string; areaId: string; isHidden?: boolean }): Promise<RoomType> => {
+export const updateRoomTypeApi = async (id: string, updates: { name: string; areaId: string; isHidden?: boolean; photoUrl?: string }): Promise<RoomType> => {
     return RoomService.updateRoomType(id, updates);
 };
 
