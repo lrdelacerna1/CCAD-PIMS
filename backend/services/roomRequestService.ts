@@ -1,3 +1,4 @@
+
 import {
     collection,
     getDocs,
@@ -12,7 +13,7 @@ import {
     writeBatch
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
+import { RoomRequest, RoomRequestStatus, RoomType } from '../../frontend/types';
 import { NotificationService } from "./notificationService";
 
 interface User {
@@ -22,6 +23,7 @@ interface User {
 
 const roomRequestsCollection = collection(db, "roomRequests");
 const usersCollection = collection(db, "users");
+const roomTypesCollection = collection(db, "roomTypes");
 
 export const RoomRequestService = {
     
@@ -69,6 +71,15 @@ export const RoomRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
         
+        // Fetch RoomType to get the areaId
+        const roomTypeRef = doc(roomTypesCollection, data.roomTypeId);
+        const roomTypeSnap = await getDoc(roomTypeRef);
+        if (!roomTypeSnap.exists()) {
+            throw new Error("The selected room type does not exist.");
+        }
+        const roomType = roomTypeSnap.data() as RoomType;
+        const areaId = roomType.areaId;
+
         const needsEndorsement = requestingUser && (requestingUser.role === 'student' || requestingUser.role === 'guest');
         const initialStatus: RoomRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
 
@@ -76,6 +87,7 @@ export const RoomRequestService = {
             ...data,
             status: initialStatus,
             dateFiled: serverTimestamp(),
+            areaId: areaId,
         };
 
         const docRef = await addDoc(roomRequestsCollection, newRequestData);
@@ -231,7 +243,7 @@ export const RoomRequestService = {
                     await NotificationService.createNotification({
                         userId: endorserId,
                         title: "Request Status Updated",
-                        message: `The room request for "${req.purpose}" by ${req.userName} has been updated to: ${status}.`,
+                        message: `The room request for "${req.purpose}" by ${request.userName} has been updated to: ${status}.`,
                         isRead: false,
                         link: "/my-endorsements"
                     });

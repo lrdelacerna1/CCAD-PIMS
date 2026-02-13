@@ -20,10 +20,7 @@ export interface Area {
     id: string;
     name: string;
     description: string;
-    penaltySettings?: {
-        penaltyAmount: number;
-        penaltyInterval: 'per_day' | 'per_hour';
-    };
+    penaltyAmount: number;
 }
 
 // --- INVENTORY & EQUIPMENT --- //
@@ -134,6 +131,9 @@ export interface EquipmentRequest {
     rejectionReason?: string;
     cancellationReason?: string;
     dateFiled: string; // ISO string
+    areaId: string;
+    returnDate?: string;
+    equipmentName?: string;
 }
 
 export const AllRoomRequestStatuses = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Rejected', 'Ready for Check-in', 'In Use', 'Completed', 'Overdue', 'Cancelled'] as const;
@@ -157,6 +157,9 @@ export interface RoomRequest {
     rejectionReason?: string;
     cancellationReason?: string;
     dateFiled: string; // ISO string
+    areaId: string;
+    returnDate?: string;
+    roomName?: string;
 }
 
 export interface Reservation {
@@ -201,12 +204,10 @@ export interface Notification {
 export interface Penalty {
   id: string;
   userId: string;
-  userName: string;
-  requestType: 'equipment' | 'room';
-  requestId: string;
-  reason: 'Late Return' | 'Damaged Equipment' | 'Room No-Show' | 'Other';
-  details: string; 
+  reason: string;
   amount: number;
   isPaid: boolean;
+  requestId: string;
+  requestType: 'equipment' | 'room';
   createdAt: string; // ISO string
 }

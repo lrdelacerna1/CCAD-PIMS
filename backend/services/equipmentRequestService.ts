@@ -1,3 +1,4 @@
+
 import {
     collection,
     getDocs,
@@ -12,7 +13,7 @@ import {
     writeBatch
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { EquipmentRequest, EquipmentRequestStatus } from '../../frontend/types';
+import { EquipmentRequest, EquipmentRequestStatus, InventoryItem } from '../../frontend/types';
 import { NotificationService } from "./notificationService";
 
 interface User {
@@ -22,6 +23,7 @@ interface User {
 
 const equipmentRequestsCollection = collection(db, "equipmentRequests");
 const usersCollection = collection(db, "users");
+const inventoryCollection = collection(db, "inventory");
 
 export const EquipmentRequestService = {
     
@@ -68,7 +70,16 @@ export const EquipmentRequestService = {
         const userRef = doc(db, "users", data.userId);
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
-        
+
+        // Determine areaId from the first requested item.
+        let areaId = '';
+        if (data.requestedItems.length > 0) {
+            const firstItem = await getDoc(doc(inventoryCollection, data.requestedItems[0].itemId));
+            if (firstItem.exists()) {
+                areaId = (firstItem.data() as InventoryItem).areaId;
+            }
+        }
+
         const needsEndorsement = requestingUser && (requestingUser.role === 'student' || requestingUser.role === 'guest');
         const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
 
@@ -76,6 +87,7 @@ export const EquipmentRequestService = {
             ...data,
             status: initialStatus,
             dateFiled: serverTimestamp(),
+            areaId: areaId, // Add areaId to the request
         };
 
         const docRef = await addDoc(equipmentRequestsCollection, newRequestData);
@@ -84,9 +96,6 @@ export const EquipmentRequestService = {
 
         // Notify endorser if applicable
         if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
-            // In a real app, this might trigger an email. 
-            // Since we use in-app notifications and don't easily map email to userId without a lookup, 
-            // we'll skip direct user notification for endorser unless we find them.
             const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
