@@ -4,7 +4,7 @@ import {
     query,
     where,
     getDocs,
-    getDoc, // Correctly import getDoc
+    getDoc,
     doc,
     updateDoc,
     addDoc,
@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { Penalty } from "../../frontend/types";
+import { NotificationService } from "./notificationService";
 
 const penaltiesCollection = collection(db, "penalties");
 
@@ -48,6 +49,19 @@ export class PenaltyService {
     static async markPenaltyAsPaid(penaltyId: string): Promise<void> {
         const penaltyRef = doc(db, "penalties", penaltyId);
         await updateDoc(penaltyRef, { isPaid: true });
+
+        const penaltySnap = await getDoc(penaltyRef);
+        const penalty = penaltySnap.data() as Penalty;
+
+        if (penalty) {
+            await NotificationService.createNotification({
+                userId: penalty.userId,
+                title: "Penalty Resolved",
+                message: `Your penalty for "${penalty.reason}" has been marked as paid.`,
+                isRead: false,
+                link: "/penalties"
+            });
+        }
     }
 
     static async createPenalty(penaltyData: Omit<Penalty, 'id' | 'createdAt'>): Promise<Penalty> {
@@ -56,8 +70,18 @@ export class PenaltyService {
             createdAt: serverTimestamp(),
         });
 
-        const newDocSnap = await getDoc(penaltyDocRef); // Use getDoc with the DocumentReference
+        const newDocSnap = await getDoc(penaltyDocRef);
         const newPenalty = newDocSnap.data();
+
+        if (newPenalty) {
+            await NotificationService.createNotification({
+                userId: newPenalty.userId,
+                title: "New Penalty Issued",
+                message: `You have received a new penalty for "${newPenalty.reason}". Amount: ₱${newPenalty.amount}`,
+                isRead: false,
+                link: "/penalties"
+            });
+        }
 
         return {
             id: newDocSnap.id,
