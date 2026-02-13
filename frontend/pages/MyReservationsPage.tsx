@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
@@ -10,7 +11,7 @@ import { Button } from '../components/ui/Button';
 import { format } from 'date-fns';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { SearchIcon } from '../components/Icons';
+import { SearchIcon, ClockIcon, XIcon } from '../components/Icons';
 import ReservationDetailsModal from '../components/reservations/ReservationDetailsModal';
 
 // --- Reusable Components ---
@@ -147,6 +148,119 @@ const PenaltyHistoryList: React.FC<{ penalties: Penalty[], requests: (EquipmentR
     );
 };
 
+const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areasMap: Map<string, string> }> = ({ userId, onClose, areasMap }) => {
+    const [allRequests, setAllRequests] = useState<AnyRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [typeFilter, setTypeFilter] = useState<'all' | 'equipment' | 'room'>('all');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const [eqData, roomData] = await Promise.all([
+                    getEquipmentRequestsByUserIdApi(userId),
+                    getRoomRequestsByUserIdApi(userId),
+                ]);
+                setAllRequests([...eqData, ...roomData]);
+            } catch (error) {
+                console.error("Failed to fetch user history:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [userId]);
+    
+    const getType = (req: AnyRequest) => 'requestedItems' in req ? 'Equipment' : 'Room';
+    const getName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems.map(i => i.name).join(', ') : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
+
+    const filteredRequests = useMemo(() => {
+        let filtered = allRequests;
+
+        if (typeFilter !== 'all') {
+            filtered = filtered.filter(req => (typeFilter === 'equipment') === ('requestedItems' in req));
+        }
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(req => 
+                req.purpose.toLowerCase().includes(query) ||
+                getName(req).toLowerCase().includes(query)
+            );
+        }
+
+        return filtered.sort((a, b) => new Date(b.dateFiled).getTime() - new Date(a.dateFiled).getTime());
+    }, [allRequests, searchQuery, typeFilter]);
+
+    return (
+         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center flex-shrink-0">
+                    <h2 className="text-xl font-bold">Complete Request History</h2>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-4 flex-shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <Input
+                            placeholder="Search by purpose or item name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            icon={<SearchIcon className="w-4 h-4" />}
+                        />
+                        <Select
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value as any)}
+                            options={[
+                                { value: 'all', label: 'All Types' },
+                                { value: 'equipment', label: 'Equipment' },
+                                { value: 'room', label: 'Rooms' },
+                            ]}
+                        />
+                    </div>
+                </div>
+                <div className="px-4 pb-4 overflow-y-auto flex-grow">
+                    {isLoading ? (
+                        <p className="text-center py-8">Loading history...</p>
+                    ) : filteredRequests.length === 0 ? (
+                        <p className="text-center text-slate-500 dark:text-slate-400 py-8">No history found.</p>
+                    ) : (
+                         <div className="overflow-x-auto relative border sm:rounded-lg dark:border-slate-700">
+                            <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3">Type</th>
+                                        <th scope="col" className="px-6 py-3">Details</th>
+                                        <th scope="col" className="px-6 py-3">Dates</th>
+                                        <th scope="col" className="px-6 py-3">Status</th>
+                                        <th scope="col" className="px-6 py-3">Date Filed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredRequests.map(req => (
+                                        <tr key={req.id} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
+                                            <td className="px-6 py-4">{getType(req)}</td>
+                                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                                                {getName(req)}
+                                                <p className="text-xs text-slate-500 font-normal">{req.purpose}</p>
+                                            </td>
+                                            <td className="px-6 py-4">{format(new Date(req.requestedStartDate), 'MMM d, yyyy')} - {format(new Date(req.requestedEndDate), 'MMM d, yyyy')}</td>
+                                            <td className="px-6 py-4"><StatusBadge status={req.status} /></td>
+                                            <td className="px-6 py-4">{format(new Date(req.dateFiled), 'MMM d, yyyy')}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const MyReservationsPage: React.FC = () => {
     const { user } = useAuth();
@@ -168,6 +282,7 @@ const MyReservationsPage: React.FC = () => {
     const [requestToCancel, setRequestToCancel] = useState<AnyRequest | null>(null);
     const [viewingRequest, setViewingRequest] = useState<AnyRequest | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -350,7 +465,7 @@ const MyReservationsPage: React.FC = () => {
     return (
         <div className="container mx-auto p-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold dark:text-white font-heading">My Requests</h1>
+                <h1 className="text-3xl font-bold dark:text-white font-heading">My Reservations</h1>
                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     {/* Conditionally render buttons based on active tab */}
                     {mainTab === 'equipment' && (
@@ -363,6 +478,14 @@ const MyReservationsPage: React.FC = () => {
                             <Button className="!w-full sm:!w-auto">+ Request a Room</Button>
                         </Link>
                     )}
+                    <Button
+                        variant="secondary"
+                        className="!w-full sm:!w-auto"
+                        onClick={() => setIsHistoryModalOpen(true)}
+                        title="View Full History"
+                    >
+                        <ClockIcon className="w-5 h-5" />
+                    </Button>
                 </div>
             </div>
 
@@ -469,6 +592,10 @@ const MyReservationsPage: React.FC = () => {
                     reservation={viewingRequest}
                     onClose={() => setViewingRequest(null)}
                 />
+            )}
+
+            {isHistoryModalOpen && user && (
+                <AllUserHistoryModal userId={user.id} onClose={() => setIsHistoryModalOpen(false)} areasMap={areasMap} />
             )}
         </div>
     );

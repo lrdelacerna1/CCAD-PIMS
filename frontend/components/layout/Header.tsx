@@ -129,7 +129,7 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                         </button>
                         {isAdminDropdownOpen && (
                             <div className={dropdownContainerClass}>
-                                <NavLink to="/all-requests" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Requests</NavLink>
+                                <NavLink to="/all-requests" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Reservations</NavLink>
                                 <NavLink to="/inventory" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Inventory Management</NavLink>
                                 <NavLink to="/admin" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>
                                     Areas & Administrators
@@ -228,7 +228,7 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                 {(isAdmin || isSuperAdmin) && (
                   <>
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Management</div>
-                    <NavLink to="/all-requests" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Requests</NavLink>
+                    <NavLink to="/all-requests" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Reservations</NavLink>
                     <NavLink to="/inventory" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Inventory Management</NavLink>
                     <NavLink to="/admin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>
                       Areas & Administrators

@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-// FIX: Use specific request types instead of the legacy Reservation type.
 import { Area, EquipmentRequest, RoomRequest, AllEquipmentRequestStatuses, AllRoomRequestStatuses, User, ReservationSettings } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
-// FIX: Import from existing APIs for equipment and room requests.
 import { getAllEquipmentRequestsApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getAllRoomRequestsApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
 import { getAllUsersApi } from '../../backend/api/auth';
@@ -200,7 +198,7 @@ const AllRequestsPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold dark:text-white mb-6 font-heading">All Requests</h1>
+            <h1 className="text-3xl font-bold dark:text-white mb-6 font-heading">Reservations</h1>
             
             <div className="border-b border-slate-200 dark:border-slate-700 my-6">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
@@ -214,9 +212,9 @@ const AllRequestsPage: React.FC = () => {
             {activeTab !== 'accountability' && (
                 <>
                     <div className="flex justify-between items-center mb-6">
-                        <p className="text-slate-500 dark:text-slate-400">Showing {filteredAndSortedRequests.length} {activeTab} request(s).</p>
+                        <p className="text-slate-500 dark:text-slate-400">Showing {filteredAndSortedRequests.length} {activeTab} reservation(s).</p>
                         <Button className="!w-auto" onClick={() => setIsNewRequestModalOpen(true)}>
-                            + New Request
+                            + New Reservation
                         </Button>
                     </div>
                     
@@ -294,7 +292,7 @@ const AllRequestsPage: React.FC = () => {
                                     )) : (
                                         <tr>
                                             <td colSpan={6} className="text-center p-6">
-                                                <p className="text-slate-500 dark:text-slate-400">No {activeTab} requests match your criteria.</p>
+                                                <p className="text-slate-500 dark:text-slate-400">No {activeTab} reservations match your criteria.</p>
                                             </td>
                                         </tr>
                                     )}
