@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -59,6 +58,7 @@ const AllRequestsPage: React.FC = () => {
     const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
     const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
 
+    // Initialize activeTab from location state if available
     useEffect(() => {
         const stateTab = (location.state as any)?.activeTab;
         if (stateTab) {
@@ -114,8 +114,8 @@ const AllRequestsPage: React.FC = () => {
     const getAreaId = (req: AnyRequest) => {
         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
         if ('roomTypeId' in req) {
-             const room = areas.find(area => area.id === req.roomTypeId);
-             return room ? room.id : '';
+             const roomType = areas.find(area => area.id === req.roomTypeId);
+             return roomType ? roomType.id : '';
         }
         return '';
     };

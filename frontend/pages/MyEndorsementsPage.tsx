@@ -44,10 +44,6 @@ const RequestsTable: React.FC<{
 }> = ({ requests, onEndorse, onReject, onRowClick, areasMap, resourceType }) => {
     
     const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
-    const getAreaName = (req: AnyRequest) => {
-        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : ('requestedRoom' in req ? req.requestedRoom.areaId : '');
-        return areasMap.get(areaId) || 'Unknown Area';
-    };
     const getDateTimeString = (req: AnyRequest) => {
         const start = format(new Date(req.requestedStartDate + 'T00:00:00Z'), 'MMM d, yyyy');
         if ('requestedItems' in req) {
@@ -66,7 +62,7 @@ const RequestsTable: React.FC<{
                 <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-400 font-heading">
                     <tr>
                         <th scope="col" className="px-6 py-3">{resourceType === 'equipment' ? 'Item' : 'Room'}</th>
-                        <th scope="col" className="px-6 py-3">Area</th>
+                        <th scope="col" className="px-6 py-3">Requestor</th>
                         <th scope="col" className="px-6 py-3">Date & Time</th>
                         <th scope="col" className="px-6 py-3">Status</th>
                         <th scope="col" className="px-6 py-3">Action</th>
@@ -82,7 +78,7 @@ const RequestsTable: React.FC<{
                             <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap dark:text-white">
                                 {getItemName(req)}
                             </td>
-                            <td className="px-6 py-4">{getAreaName(req)}</td>
+                            <td className="px-6 py-4">{req.userName}</td>
                             <td className="px-6 py-4">{getDateTimeString(req)}</td>
                             <td className="px-6 py-4"><StatusBadge status={req.status} /></td>
                             <td className="px-6 py-4" onClick={e => e.stopPropagation()}>

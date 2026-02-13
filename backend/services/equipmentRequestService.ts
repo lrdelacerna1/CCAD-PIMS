@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { EquipmentRequest, EquipmentRequestStatus } from '../../frontend/types';
+import { NotificationService } from "./notificationService";
 
 interface User {
     id: string;
@@ -82,6 +83,25 @@ export const EquipmentRequestService = {
         const newDocSnap = await getDoc(docRef);
         const createdData = newDocSnap.data();
 
+        // Notify endorser if applicable
+        if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
+            // In a real app, this might trigger an email. 
+            // Since we use in-app notifications and don't easily map email to userId without a lookup, 
+            // we'll skip direct user notification for endorser unless we find them.
+            const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
+            const endorserSnapshot = await getDocs(endorserQuery);
+            if (!endorserSnapshot.empty) {
+                const endorserId = endorserSnapshot.docs[0].id;
+                await NotificationService.createNotification({
+                    userId: endorserId,
+                    title: "New Endorsement Request",
+                    message: `${data.userName} has requested your endorsement for equipment.`,
+                    isRead: false,
+                    link: "/my-endorsements"
+                });
+            }
+        }
+
         return {
             id: docRef.id,
             ...createdData,
@@ -91,6 +111,12 @@ export const EquipmentRequestService = {
 
     async updateStatus(id: string, status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
         const reqRef = doc(db, "equipmentRequests", id);
+        
+        // Fetch request first to get details for notification
+        const reqSnap = await getDoc(reqRef);
+        if (!reqSnap.exists()) return;
+        const request = reqSnap.data() as EquipmentRequest;
+
         const updateData: any = { status };
         
         if (status === 'Rejected' && rejectionReason) {
@@ -98,16 +124,44 @@ export const EquipmentRequestService = {
         }
         
         await updateDoc(reqRef, updateData);
+
+        // Notify Requester
+        await NotificationService.createNotification({
+            userId: request.userId,
+            title: "Request Status Updated",
+            message: `Your equipment request for "${request.purpose}" status has been updated to: ${status}.`,
+            isRead: false,
+            link: "/my-reservations"
+        });
     },
     
     async updateStatusBatch(ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
         const batch = writeBatch(db);
-        ids.forEach(id => {
+        const requestsToNotify: EquipmentRequest[] = [];
+
+        for (const id of ids) {
             const ref = doc(db, "equipmentRequests", id);
-            const data: any = { status };
-            if (status === 'Rejected' && rejectionReason) data.rejectionReason = rejectionReason;
-            batch.update(ref, data);
-        });
+            const reqSnap = await getDoc(ref);
+            
+            if (reqSnap.exists()) {
+                requestsToNotify.push(reqSnap.data() as EquipmentRequest);
+                const data: any = { status };
+                if (status === 'Rejected' && rejectionReason) data.rejectionReason = rejectionReason;
+                batch.update(ref, data);
+            }
+        }
+        
         await batch.commit();
+
+        // Notify Requesters
+        for (const req of requestsToNotify) {
+             await NotificationService.createNotification({
+                userId: req.userId,
+                title: "Request Status Updated",
+                message: `Your equipment request for "${req.purpose}" status has been updated to: ${status}.`,
+                isRead: false,
+                link: "/my-reservations"
+            });
+        }
     }
 }

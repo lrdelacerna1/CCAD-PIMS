@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
+import { NotificationService } from "./notificationService";
 
 interface User {
     id: string;
@@ -83,6 +84,22 @@ export const RoomRequestService = {
         const newDocSnap = await getDoc(docRef);
         const createdData = newDocSnap.data();
 
+        // Notify endorser if applicable
+        if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
+            const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
+            const endorserSnapshot = await getDocs(endorserQuery);
+            if (!endorserSnapshot.empty) {
+                const endorserId = endorserSnapshot.docs[0].id;
+                await NotificationService.createNotification({
+                    userId: endorserId,
+                    title: "New Endorsement Request",
+                    message: `${data.userName} has requested your endorsement for a room.`,
+                    isRead: false,
+                    link: "/my-endorsements"
+                });
+            }
+        }
+
         return {
             id: docRef.id,
             ...createdData,
@@ -92,6 +109,11 @@ export const RoomRequestService = {
 
     async updateStatus(id: string, status: RoomRequestStatus, rejectionReason?: string): Promise<void> {
         const reqRef = doc(db, "roomRequests", id);
+        
+        const reqSnap = await getDoc(reqRef);
+        if (!reqSnap.exists()) return;
+        const request = reqSnap.data() as RoomRequest;
+
         const updateData: any = { status };
         
         if (status === 'Rejected' && rejectionReason) {
@@ -99,16 +121,43 @@ export const RoomRequestService = {
         }
         
         await updateDoc(reqRef, updateData);
+
+        // Notify Requester
+        await NotificationService.createNotification({
+            userId: request.userId,
+            title: "Request Status Updated",
+            message: `Your room request for "${request.purpose}" status has been updated to: ${status}.`,
+            isRead: false,
+            link: "/my-reservations"
+        });
     },
 
     async updateStatusBatch(ids: string[], status: RoomRequestStatus, rejectionReason?: string): Promise<void> {
         const batch = writeBatch(db);
-        ids.forEach(id => {
+        const requestsToNotify: RoomRequest[] = [];
+
+        for (const id of ids) {
             const ref = doc(db, "roomRequests", id);
-            const data: any = { status };
-            if (status === 'Rejected' && rejectionReason) data.rejectionReason = rejectionReason;
-            batch.update(ref, data);
-        });
+            const reqSnap = await getDoc(ref);
+            if (reqSnap.exists()) {
+                requestsToNotify.push(reqSnap.data() as RoomRequest);
+                const data: any = { status };
+                if (status === 'Rejected' && rejectionReason) data.rejectionReason = rejectionReason;
+                batch.update(ref, data);
+            }
+        }
+
         await batch.commit();
+
+        // Notify Requesters
+        for (const req of requestsToNotify) {
+            await NotificationService.createNotification({
+                userId: req.userId,
+                title: "Request Status Updated",
+                message: `Your room request for "${req.purpose}" status has been updated to: ${status}.`,
+                isRead: false,
+                link: "/my-reservations"
+            });
+        }
     }
 }
