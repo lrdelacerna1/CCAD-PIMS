@@ -7,6 +7,7 @@ import { getInventoryCatalogApi, checkAvailabilityApi, getInventoryApi } from '.
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { Checkbox } from '../ui/Checkbox';
 import { InformationCircleIcon, XIcon, MailIcon, UserIcon } from '../Icons';
 import { Select } from '../ui/Select';
 
@@ -45,6 +46,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
     const [endorserName, setEndorserName] = useState('');
     const [endorserPosition, setEndorserPosition] = useState('');
     const [endorserEmail, setEndorserEmail] = useState('');
+    const [termsAccepted, setTermsAccepted] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -168,6 +170,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         }
         if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
         if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
+        if (!termsAccepted) { setError('You must accept the terms and conditions.'); return; }
         
         setIsLoading(true);
         setError('');
@@ -362,7 +365,19 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 required 
                             />
                         </div>
-
+                        <div className="pt-2">
+                            <Checkbox
+                                id="terms-and-conditions-equip"
+                                checked={termsAccepted}
+                                onChange={(e) => setTermsAccepted(e.target.checked)}
+                                label={
+                                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                                        I declare that I have read and agree to the terms and conditions for borrowing equipment.
+                                        I understand that I am responsible for the equipment and may be liable for any damages or loss.
+                                    </span>
+                                }
+                            />
+                        </div>
                         <div className="p-3 bg-amber-50 dark:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800">
                             <div className="flex items-center gap-2">
                                 <InformationCircleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
@@ -377,7 +392,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
 
                     <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0 rounded-b-lg">
                         <Button type="button" onClick={onClose} className="!w-auto" variant="secondary">Cancel</Button>
-                        <Button type="submit" isLoading={isLoading} className="!w-auto">Submit Request</Button>
+                        <Button type="submit" isLoading={isLoading} disabled={!termsAccepted} className="!w-auto">Submit Request</Button>
                     </div>
                 </form>
             </div>
