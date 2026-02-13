@@ -1,4 +1,3 @@
-
 import {
     collection,
     getDocs,
@@ -124,13 +123,23 @@ export const RoomRequestService = {
         await updateDoc(reqRef, updateData);
 
         // Notify Requester
-        await NotificationService.createNotification({
-            userId: request.userId,
-            title: "Request Status Updated",
-            message: `Your room request for "${request.purpose}" status has been updated to: ${status}.`,
-            isRead: false,
-            link: "/my-reservations"
-        });
+        if (status === 'Completed') {
+            await NotificationService.createNotification({
+                userId: request.userId,
+                title: "Request Completed",
+                message: `Your room request for "${request.purpose}" has been marked as completed.`,
+                isRead: false,
+                link: "/my-reservations"
+            });
+        } else {
+            await NotificationService.createNotification({
+                userId: request.userId,
+                title: "Request Status Updated",
+                message: `Your room request for "${request.purpose}" status has been updated to: ${status}.`,
+                isRead: false,
+                link: "/my-reservations"
+            });
+        }
 
         // If the status has been changed from 'Pending Endorsement' to 'Pending Approval', notify the endorser that they have successfully endorsed the request.
         if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval' && request.endorserEmail) {
@@ -182,13 +191,24 @@ export const RoomRequestService = {
         // Notify Requesters and Endorsers
         for (const req of requestsToNotify) {
             // Notify Requester
-            await NotificationService.createNotification({
-                userId: req.userId,
-                title: "Request Status Updated",
-                message: `Your room request for "${req.purpose}" status has been updated to: ${status}.`,
-                isRead: false,
-                link: "/my-reservations"
-            });
+            if (status === 'Completed') {
+                await NotificationService.createNotification({
+                    userId: req.userId,
+                    title: "Request Completed",
+                    message: `Your room request for "${req.purpose}" has been marked as completed.`,
+                    isRead: false,
+                    link: "/my-reservations"
+                });
+            } else {
+                await NotificationService.createNotification({
+                    userId: req.userId,
+                    title: "Request Status Updated",
+                    message: `Your room request for "${req.purpose}" status has been updated to: ${status}.`,
+                    isRead: false,
+                    link: "/my-reservations"
+                });
+            }
+
             // If the status has been changed from 'Pending Endorsement' to 'Pending Approval', notify the endorser that they have successfully endorsed the request.
             if (req.status === 'Pending Endorsement' && status === 'Pending Approval' && req.endorserEmail) {
                 const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
