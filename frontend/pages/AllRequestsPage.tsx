@@ -35,19 +35,6 @@ const StatusBadge: React.FC<{ status: AnyRequest['status'] }> = ({ status }) => 
     return <span className={`${baseClasses} ${colors[colorKey] || colors['closed']}`}>{status}</span>;
 };
 
-const AirSlateStatusBadge: React.FC<{ status: AnyRequest['airSlateStatus'] }> = ({ status }) => {
-    if (!status) return null;
-    const baseClasses = "px-1.5 py-0.5 text-[10px] font-medium rounded-full capitalize whitespace-nowrap";
-    let colorClass = '';
-    switch (status) {
-        case 'Pending Signature': colorClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'; break;
-        case 'Completed': colorClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'; break;
-        case 'Rejected': colorClass = 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'; break;
-    }
-    return <span className={`${baseClasses} ${colorClass}`}>{status}</span>;
-};
-
-
 const AllRequestsPage: React.FC = () => {
     const { user } = useAuth();
     const location = useLocation();
@@ -237,7 +224,6 @@ const AllRequestsPage: React.FC = () => {
                                         <th scope="col" className="px-6 py-3">Area</th>
                                         <th scope="col" className="px-6 py-3">Date & Time</th>
                                         <th scope="col" className="px-6 py-3">Status</th>
-                                        <th scope="col" className="px-6 py-3">Document</th>
                                         <th scope="col" className="px-6 py-3">Action</th>
                                     </tr>
                                 </thead>
@@ -273,17 +259,7 @@ const AllRequestsPage: React.FC = () => {
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-1 items-start">
                                                     <StatusBadge status={req.status} />
-                                                    {req.airSlateStatus && <AirSlateStatusBadge status={req.airSlateStatus} />}
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {req.airSlateDocumentUrl ? (
-                                                    <a href={req.airSlateDocumentUrl} target="_blank" rel="noopener noreferrer" className="inline-block p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400" title="View Approval Document" onClick={e => e.stopPropagation()}>
-                                                        <DocumentDuplicateIcon className="w-5 h-5" />
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-slate-400 dark:text-slate-500">-</span>
-                                                )}
                                             </td>
                                             <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                                                 {renderActions(req)}

@@ -15,7 +15,6 @@ import {
 import { db } from "../../lib/firebase";
 import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
 
-// IMPORTANT: Define User interface locally or import from a shared types file if not available
 interface User {
     id: string;
     role: 'student' | 'admin' | 'superadmin' | 'faculty' | 'guest';
@@ -70,7 +69,6 @@ export const RoomRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
         
-        // Fix: Consistency with EquipmentRequestService
         const isAdminRequest = requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'superadmin');
         const initialStatus: RoomRequestStatus = isAdminRequest ? 'Pending Approval' : 'Pending Endorsement';
 
