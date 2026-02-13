@@ -775,7 +775,7 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
                                 <tr>
                                     <th scope="col" className="px-4 py-2 rounded-l-md">Asset Tag</th>
                                     <th scope="col" className="px-4 py-2">Condition</th>
-                                    <th scope="col" className="px-4 py-2">Status</th>
+                                    <th scope="col" className="px-4 py-2">Today</th>
                                     <th scope="col" className="px-4 py-2 rounded-r-md text-right">Action</th>
                                 </tr>
                             </thead>
