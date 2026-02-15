@@ -1,7 +1,7 @@
 import React from 'react';
 import { EquipmentRequest, RoomRequest, Penalty } from '../../types';
 import { Button } from '../ui/Button';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import {
     XIcon,
     InventoryIcon,
@@ -92,8 +92,13 @@ const ReservationDetailsModal: React.FC<{
         onClose();
     };
 
-    const startDateStr = format(new Date(reservation.requestedStartDate + 'T00:00:00Z'), 'yyyy-MM-dd');
-    const endDateStr = format(new Date(reservation.requestedEndDate + 'T00:00:00Z'), 'yyyy-MM-dd');
+    const formatDate = (date: string | Date, formatStr: string) => {
+        const d = new Date(date);
+        return isValid(d) ? format(d, formatStr) : 'N/A';
+    };
+
+    const startDateStr = formatDate(reservation.requestedStartDate, 'yyyy-MM-dd');
+    const endDateStr = formatDate(reservation.requestedEndDate, 'yyyy-MM-dd');
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -125,14 +130,14 @@ const ReservationDetailsModal: React.FC<{
                     )}
                     {reservation.status === 'Cancelled' && (
                          <ConditionalInfoCard icon={<ExclamationTriangleIcon className="w-5 h-5"/>} title="Cancellation Info" colorClass="bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-900/40 dark:text-violet-200 dark:border-violet-800">
-                            Cancelled on {reservation.cancelledAt ? format(new Date(reservation.cancelledAt), 'MMM d, yyyy, h:mm a') : 'N/A'}
+                            Cancelled on {formatDate(reservation.cancelledAt, 'MMM d, yyyy, h:mm a')}
                         </ConditionalInfoCard>
                     )}
                     {isEquipment && reservation.returnDetails && (
                          <ConditionalInfoCard icon={<ClipboardDocumentCheckIcon className="w-5 h-5"/>} title="Return Details" colorClass="bg-slate-50 text-slate-800 border-slate-200 dark:bg-slate-700/50 dark:text-slate-200 dark:border-slate-600">
                             <p><strong>Condition:</strong> {reservation.returnDetails.condition}</p>
                             <p><strong>Notes:</strong> {reservation.returnDetails.notes}</p>
-                            <p><strong>Returned At:</strong> {format(new Date(reservation.returnDetails.returnedAt), 'MMM d, yyyy, h:mm a')}</p>
+                            <p><strong>Returned At:</strong> {formatDate(reservation.returnDetails.returnedAt, 'MMM d, yyyy, h:mm a')}</p>
                          </ConditionalInfoCard>
                     )}
                     {reservation.airSlateDocumentId && (
@@ -219,7 +224,7 @@ const ReservationDetailsModal: React.FC<{
                     )}
                     
                     <div className="pt-2 text-xs text-slate-400 dark:text-slate-500 text-center">
-                        Request filed on {format(new Date(reservation.dateFiled), 'MMM d, yyyy, h:mm a')}
+                        Request filed on {formatDate(reservation.dateFiled, 'MMM d, yyyy, h:mm a')}
                     </div>
 
                 </div>

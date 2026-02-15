@@ -45,12 +45,33 @@ const RequestsTable: React.FC<{
     
     const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
     const getDateTimeString = (req: AnyRequest) => {
-        const start = format(new Date(req.requestedStartDate + 'T00:00:00Z'), 'MMM d, yyyy');
-        if ('requestedItems' in req) {
-            const end = format(new Date(req.requestedEndDate + 'T00:00:00Z'), 'MMM d, yyyy');
+        if (!req.requestedStartDate) {
+            return 'N/A';
+        }
+        
+        const startDate = new Date(req.requestedStartDate + 'T00:00:00Z');
+        if (isNaN(startDate.getTime())) {
+            return 'Invalid date';
+        }
+        const start = format(startDate, 'MMM d, yyyy');
+
+        if ('requestedItems' in req) { // Equipment request
+            if (!req.requestedEndDate) {
+                return start;
+            }
+            const endDate = new Date(req.requestedEndDate + 'T00:00:00Z');
+            if (isNaN(endDate.getTime())) {
+                return start;
+            }
+            const end = format(endDate, 'MMM d, yyyy');
             return start === end ? start : `${start} to ${end}`;
-        } else {
-            return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
+        } else { // Room request
+            const startTime = 'requestedStartTime' in req ? req.requestedStartTime : '';
+            const endTime = 'requestedEndTime' in req ? req.requestedEndTime : '';
+            if (startTime && endTime) {
+                return `${start} at ${startTime} - ${endTime}`;
+            }
+            return start;
         }
     };
     
