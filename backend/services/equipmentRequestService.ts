@@ -71,7 +71,6 @@ export const EquipmentRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
 
-        // Determine areaId from the first requested item.
         let areaId = '';
         if (data.requestedItems.length > 0) {
             const firstItem = await getDoc(doc(inventoryCollection, data.requestedItems[0].itemId));
@@ -80,21 +79,26 @@ export const EquipmentRequestService = {
             }
         }
 
-        const needsEndorsement = requestingUser && (requestingUser.role === 'student' || requestingUser.role === 'guest');
-        const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
+        let initialStatus: EquipmentRequestStatus;
+        if (requestingUser?.role === 'student') {
+            initialStatus = 'Pending Endorsement';
+        } else if (requestingUser?.role === 'guest') {
+            initialStatus = data.endorserEmail ? 'Pending Endorsement' : 'Pending Approval';
+        } else {
+            initialStatus = 'Pending Approval';
+        }
 
         const newRequestData = {
             ...data,
             status: initialStatus,
             dateFiled: serverTimestamp(),
-            areaId: areaId, // Add areaId to the request
+            areaId: areaId,
         };
 
         const docRef = await addDoc(equipmentRequestsCollection, newRequestData);
         const newDocSnap = await getDoc(docRef);
         const createdData = newDocSnap.data();
 
-        // Notify endorser if applicable
         if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
             const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
@@ -120,7 +124,6 @@ export const EquipmentRequestService = {
     async updateStatus(id: string, status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
         const reqRef = doc(db, "equipmentRequests", id);
         
-        // Fetch request first to get details for notification
         const reqSnap = await getDoc(reqRef);
         if (!reqSnap.exists()) return;
         const request = reqSnap.data() as EquipmentRequest;
@@ -134,7 +137,6 @@ export const EquipmentRequestService = {
         
         await updateDoc(reqRef, updateData);
 
-        // Notify Requester
         if (status === 'Completed') {
             await NotificationService.createNotification({
                 userId: request.userId,
@@ -153,7 +155,6 @@ export const EquipmentRequestService = {
             });
         }
 
-        // If the status has been changed from 'Pending Endorsement' to 'Pending Approval', notify the endorser that they have successfully endorsed the request.
         if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval' && request.endorserEmail) {
             const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
@@ -167,7 +168,7 @@ export const EquipmentRequestService = {
                     link: "/my-endorsements"
                 });
             }
-        } else if (request.endorserEmail) { // For other status updates, send a general notification
+        } else if (request.endorserEmail) {
             const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
@@ -201,9 +202,7 @@ export const EquipmentRequestService = {
         
         await batch.commit();
 
-        // Notify Requesters and Endorsers
         for (const req of requestsToNotify) {
-            // Notify Requester
              if (status === 'Completed') {
                 await NotificationService.createNotification({
                     userId: req.userId,
@@ -222,7 +221,6 @@ export const EquipmentRequestService = {
                 });
             }
 
-            // If the status has been changed from 'Pending Endorsement' to 'Pending Approval', notify the endorser that they have successfully endorsed the request.
             if (req.status === 'Pending Endorsement' && status === 'Pending Approval' && req.endorserEmail) {
                 const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
@@ -236,7 +234,7 @@ export const EquipmentRequestService = {
                         link: "/my-endorsements"
                     });
                 }
-            } else if (req.endorserEmail) { // For other status updates, send a general notification
+            } else if (req.endorserEmail) {
                 const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
                 if (!endorserSnapshot.empty) {

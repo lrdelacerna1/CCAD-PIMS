@@ -163,11 +163,21 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
             return;
         }
         if (!purpose.trim()) { setError('Purpose is required.'); return; }
-        if (user.role === 'student' || user.role === 'guest') {
-            if (!endorserName.trim()) { setError("Endorser\'s name is required."); return; }
-            if (!endorserPosition.trim()) { setError("Endorser\'s position is required."); return; }
-            if (!endorserEmail.trim()) { setError("Endorser\'s email is required."); return; }
+        
+        if (user.role === 'student') {
+            if (!endorserName.trim() || !endorserPosition.trim() || !endorserEmail.trim()) {
+                setError("Endorser's name, position, and email are required for students.");
+                return;
+            }
+        } else if (user.role === 'guest') {
+            const hasAnyEndorserInfo = endorserName.trim() || endorserPosition.trim() || endorserEmail.trim();
+            const hasAllEndorserInfo = endorserName.trim() && endorserPosition.trim() && endorserEmail.trim();
+            if (hasAnyEndorserInfo && !hasAllEndorserInfo) {
+                setError("Please fill all endorser fields if providing an endorsement, or leave them all blank.");
+                return;
+            }
         }
+
         if (!secondaryContactName.trim()) { setError('Secondary contact name is required.'); return; }
         if (!secondaryContactNumber.trim()) { setError('Secondary contact number is required.'); return; }
         if (!termsAccepted) { setError('You must accept the terms and conditions.'); return; }
@@ -194,7 +204,8 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 requestedItems: requestedItemsPayload,
             };
 
-            if (user.role === 'student' || user.role === 'guest') {
+            const hasEndorserInfo = endorserName.trim() && endorserEmail.trim() && endorserPosition.trim();
+            if (user.role === 'student' || (user.role === 'guest' && hasEndorserInfo)) {
                 requestData.endorserName = endorserName;
                 requestData.endorserPosition = endorserPosition;
                 requestData.endorserEmail = endorserEmail;
@@ -324,7 +335,15 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                             <Textarea label="Purpose" id="purpose" value={purpose} onChange={e => setPurpose(e.target.value)} required />
                             {(user?.role === 'student' || user?.role === 'guest') && (
                                 <div className="space-y-4 pt-4 border-t dark:border-slate-600">
-                                    <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200">Endorser Information</h4>
+                                        {user.role === 'guest' && <span className="text-xs text-slate-500 dark:text-slate-400">Optional for guests</span>}
+                                    </div>
+                                    {user.role === 'guest' && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+                                            If you have a faculty endorser, your request will be sent to them for approval first. Otherwise, it will be sent to an admin.
+                                        </p>
+                                    )}
                                     <Input 
                                         label="Endorser's Name (Faculty/Advisor)"
                                         id="endorser-name"
@@ -332,7 +351,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         value={endorserName}
                                         onChange={e => setEndorserName(e.target.value)}
                                         icon={<UserIcon className="w-5 h-5"/>}
-                                        required
+                                        required={user.role === 'student'}
                                     />
                                     <Input 
                                         label="Endorser's Position"
@@ -342,7 +361,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         onChange={e => setEndorserPosition(e.target.value)}
                                         placeholder="e.g., Professor, Department Chair"
                                         icon={<BriefcaseIcon className="w-5 h-5"/>}
-                                        required
+                                        required={user.role === 'student'}
                                     />
                                     <Input 
                                         label="Endorser's Email"
@@ -351,7 +370,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         value={endorserEmail}
                                         onChange={e => setEndorserEmail(e.target.value)}
                                         icon={<MailIcon className="w-5 h-5"/>}
-                                        required
+                                        required={user.role === 'student'}
                                     />
                                 </div>
                             )}

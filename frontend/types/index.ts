@@ -29,3 +29,44 @@ export interface Notification {
   createdAt: Date;
   link?: string; // Optional link to navigate to
 }
+
+// Re-export from firestore.ts, carefully to avoid conflicts
+export type { Area } from './firestore';
+
+// Added missing types
+export interface InventoryInstance {
+  id: string;
+  assetTag: string;
+  status: string;
+  serialNumber: string;
+}
+
+export interface RoomInstance {
+  id: string;
+  roomNumber: string;
+  status: string;
+}
+
+export type AvailabilityStatus = 'Available' | 'Partially Available' | 'Unavailable' | 'Error';
+
+export interface CatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  images: string[];
+  areaId: string;
+  totalInstances: number;
+  availableInstances: number;
+  availabilityStatus: AvailabilityStatus;
+}
+
+export interface InventoryItemForCatalog extends CatalogItem {}
+
+export interface RoomTypeForCatalog extends CatalogItem {
+  capacity: number;
+}
+
+export interface ReservationSettings {
+  minimumLeadDays: number;
+  maxBookingDays: number;
+}
