@@ -1,11 +1,10 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, User as FirebaseUser, sendEmailVerification as firebaseSendEmailVerification, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, User as FirebaseUser, sendEmailVerification as firebaseSendEmailVerification, signOut as firebaseSignOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { User } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { loginUserApi, registerUserApi, signInWithGoogleApi } from '../../backend/api/auth';
+import { loginUserApi, registerUserApi } from '../../backend/api/auth';
 import { authService } from '../services/authService';
 
 export interface AuthContextType {
@@ -16,8 +15,9 @@ export interface AuthContextType {
     isFaculty: boolean;
     isUser: boolean;
     login: (email: string, pass: string) => Promise<void>;
-    register: (userData: any) => Promise<void>;
-    signInWithGoogle: () => Promise<void>;
+    register: (userData: any) => Promise<User>;
+    signInWithGoogle: () => Promise<FirebaseUser | null>;
+    signUpWithGoogle: () => Promise<FirebaseUser | null>;
     sendVerificationEmail: () => Promise<void>;
     reloadUser: () => Promise<void>;
     signOut: () => Promise<void>;
@@ -59,24 +59,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setIsAdmin(isAdminRole);
                     setIsFaculty(isFacultyRole);
                     setIsUser(!isAdminRole && !isFacultyRole);
+                    await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
                 } else {
-                    const newUser: Omit<User, 'id'> = {
-                        emailAddress: firebaseUser.email || '',
-                        emailVerified: firebaseUser.emailVerified,
-                        role: 'guest',
-                        firstName: firebaseUser.displayName?.split(' ')[0] || 'New',
-                        lastName: firebaseUser.displayName?.split(' ')[1] || 'User',
-                        createdAt: new Date().toISOString(),
-                        lastLogin: new Date().toISOString(),
-                    };
-                    await setDoc(userDocRef, newUser);
-                    setUser({ id: firebaseUser.uid, ...newUser } as unknown as User);
-                    setIsUser(true);
-                    setIsAdmin(false);
+                    // User authenticated with Firebase but no document exists
+                    // This should not happen - signInWithGoogle/signUpWithGoogle handle this
+                    setUser(null);
                     setIsSuperAdmin(false);
+                    setIsAdmin(false);
                     setIsFaculty(false);
+                    setIsUser(false);
                 }
-                await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
             } else {
                 setUser(null);
                 setIsSuperAdmin(false);
@@ -99,25 +91,96 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const register = async (userData: any) => {
+    const register = async (userData: any): Promise<User> => {
         try {
-            await registerUserApi(userData);
+            const isFacultyRegistration = userData.role === 'faculty';
+            const isUpMail = userData.emailAddress.endsWith('@up.edu.ph');
+
+            if (isFacultyRegistration && !isUpMail) {
+                throw new Error("Faculty registration is restricted to university emails only (@up.edu.ph).");
+            }
+
+            const user = await registerUserApi(userData);
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
                 await firebaseSendEmailVerification(firebaseUser);
             }
+            return user;
+
         } catch (error) {
             console.error("Registration failed:", error);
             throw error;
         }
     };
 
-    const signInWithGoogle = async () => {
+    // Sign In with Google - For Login Page (existing users only)
+    const signInWithGoogle = async (): Promise<FirebaseUser | null> => {
+        const provider = new GoogleAuthProvider();
         try {
-            await signInWithGoogleApi();
-        } catch (error) {
-            console.error("Google Sign-in failed:", error);
-            throw error;
+            const result = await signInWithPopup(auth, provider);
+            const googleUser = result.user;
+
+            if (!googleUser.email) {
+                await firebaseSignOut(auth);
+                throw new Error("Could not retrieve email from Google account.");
+            }
+
+            // Check if user document exists in Firestore
+            const userDocRef = doc(db, 'users', googleUser.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+                // Sign user out of Firebase and throw error
+                await firebaseSignOut(auth);
+                throw new Error("Account not found. Please sign up first.");
+            }
+            
+            return googleUser;
+        } catch (error: any) {
+            console.error("Google Sign-in failed:", error.message);
+            throw new Error(error.message || "An unexpected error occurred during Google Sign-in.");
+        }
+    };
+
+    // Sign Up with Google - For Register Page (creates new accounts)
+    const signUpWithGoogle = async (): Promise<FirebaseUser | null> => {
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const googleUser = result.user;
+
+            if (!googleUser.email) {
+                await firebaseSignOut(auth);
+                throw new Error("Could not retrieve email from Google account.");
+            }
+
+            // Check if user already exists
+            const userDocRef = doc(db, 'users', googleUser.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (userDoc.exists()) {
+                // User already exists - sign them out and throw error
+                await firebaseSignOut(auth);
+                throw new Error("An account with this email already exists. Please sign in instead.");
+            }
+
+            // Create new user document
+            const newUser: Omit<User, 'id'> = {
+                emailAddress: googleUser.email,
+                emailVerified: googleUser.emailVerified,
+                role: 'guest', // Will be updated based on email domain in RegisterPage
+                firstName: googleUser.displayName?.split(' ')[0] || 'New',
+                lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || 'User',
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+            };
+            
+            await setDoc(userDocRef, newUser);
+            
+            return googleUser;
+        } catch (error: any) {
+            console.error("Google Sign-up failed:", error.message);
+            throw new Error(error.message || "An unexpected error occurred during Google Sign-up.");
         }
     };
 
@@ -176,6 +239,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const newUserState = { ...user, ...updates };
             setUser(newUserState);
 
+            if (updates.role) {
+                const newRole = updates.role;
+                const isSuperAdminRole = newRole === 'superadmin';
+                const isAdminRole = newRole === 'admin' || isSuperAdminRole;
+                const isFacultyRole = newRole === 'faculty';
+
+                setIsSuperAdmin(isSuperAdminRole);
+                setIsAdmin(isAdminRole);
+                setIsFaculty(isFacultyRole);
+                setIsUser(!isAdminRole && !isFacultyRole);
+            }
+
         } catch (error) {
             console.error("Failed to update profile:", error);
             throw error;
@@ -192,6 +267,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         signInWithGoogle,
+        signUpWithGoogle,
         sendVerificationEmail,
         reloadUser,
         signOut,

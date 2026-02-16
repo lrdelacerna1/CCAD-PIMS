@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { getNotificationsByUserIdApi, markNotificationAsReadApi, markAllNotificationsAsReadApi } from '../../backend/api/notifications';
+import { notificationService } from '../services/notificationService';
 import { Notification } from '../types';
 import { useAuth } from '../hooks/useAuth';
 
@@ -26,7 +26,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
         setIsLoading(true);
         try {
-            const fetchedNotifications = await getNotificationsByUserIdApi(user.id);
+            const fetchedNotifications = await notificationService.getNotificationsForUser(user.id);
             setNotifications(fetchedNotifications);
             setError(null);
         } catch (err: any) {
@@ -54,7 +54,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
             prev.map(n => (n.id === notificationId ? { ...n, isRead: true } : n))
         );
         try {
-            await markNotificationAsReadApi(notificationId);
+            await notificationService.markNotificationAsRead(notificationId);
         } catch (error) {
             console.error("Failed to mark notification as read:", error);
             setNotifications(originalNotifications); // Revert on failure
@@ -66,7 +66,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         const originalNotifications = notifications;
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
         try {
-            await markAllNotificationsAsReadApi(user.id);
+            // This function should be implemented in your notificationService
+            // await notificationService.markAllNotificationsAsRead(user.id);
         } catch (error) {
             console.error("Failed to mark all notifications as read:", error);
             setNotifications(originalNotifications); // Revert on failure

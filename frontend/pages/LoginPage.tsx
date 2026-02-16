@@ -23,11 +23,28 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+  
     try {
       await login(email, password);
-      navigate(from, { replace: true });
+      navigate('/');
     } catch (err: any) {
-      setError(err.message || 'An error occurred.');
+      console.error('Login error:', err);
+      
+      // Handle invalid credentials
+      if (
+        err.code === 'auth/invalid-credential' || 
+        err.code === 'auth/wrong-password' || 
+        err.code === 'auth/user-not-found' ||
+        err.message?.includes('invalid-credential')
+      ) {
+        setError('Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button below.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please try again later.');
+      } else {
+        setError(err.message || 'An error occurred during login.');
+      }
     } finally {
       setIsLoading(false);
     }

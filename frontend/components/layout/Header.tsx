@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { UserIcon, LogoIcon, MenuIcon, XIcon, ChevronDownIcon } from '../Icons';
-import NotificationBell from './NotificationBell';
+import NotificationBell from '../NotificationBell';
 import AboutModal from './AboutModal';
 
 const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) => {
@@ -10,7 +10,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Dropdown states
   const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   
@@ -19,7 +18,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
   const adminDropdownRef = useRef<HTMLDivElement>(null);
   const accountDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         if (adminDropdownRef.current && !adminDropdownRef.current.contains(event.target as Node)) {
@@ -33,15 +31,12 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Base styles for navigation items based on Brandkit
   const navItemClass = "font-menu text-[13.68px] font-bold text-ccad-black uppercase px-5 py-4 hover:text-ccad-red transition-all duration-200 ease-in-out hover:scale-110 cursor-pointer flex items-center h-full transform origin-center";
   const activeNavItemClass = "text-ccad-red";
   
-  // Dropdown menu styles
   const dropdownContainerClass = "absolute top-full left-0 mt-0 w-64 bg-white shadow-xl border-t-2 border-ccad-red z-50 flex flex-col py-2";
   const dropdownItemClass = "font-sans text-[13px] text-ccad-text-primary hover:text-ccad-red px-6 py-3 block transition-colors border-b border-gray-100 last:border-0 text-left font-medium";
 
-  // Mobile menu styles
   const mobileLinkClass = "block px-5 py-3 font-menu text-[13.68px] font-bold text-ccad-black uppercase hover:bg-gray-50 hover:text-ccad-red border-b border-gray-100";
 
   const handleProfileClick = () => {
@@ -65,7 +60,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
       <nav className="container mx-auto px-6">
         <div className="flex items-center justify-between h-[80px]">
           
-          {/* Logo Section */}
           <Link to="/" target="_self" className="flex items-center group">
             <LogoIcon className="w-10 h-10 mr-3 text-ccad-red group-hover:opacity-90 transition-opacity" />
             <div className="flex flex-col">
@@ -74,7 +68,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
             </div>
           </Link>
 
-          {/* Desktop Menu */}
           <div className="hidden md:flex items-center h-full">
             {user && variant === 'main' ? (
               <>
@@ -86,7 +79,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                     Home
                  </NavLink>
 
-                {/* User & Faculty Links */}
                 {(isUser || isFaculty) && (
                   <>
                     <NavLink 
@@ -106,7 +98,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                   </>
                 )}
                 
-                {/* Faculty Links */}
                 {isFaculty && (
                   <NavLink 
                       to="/my-endorsements" 
@@ -117,8 +108,7 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                   </NavLink>
                 )}
 
-                {/* Admin Dropdown */}
-                {(isSuperAdmin || isAdmin) && (
+                {(isAdmin) && (
                   <div className="relative h-full flex items-center" ref={adminDropdownRef}>
                         <button 
                             onClick={() => setIsAdminDropdownOpen(!isAdminDropdownOpen)}
@@ -135,21 +125,29 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                                     <NavLink to="/settings" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>Area Settings</NavLink>
                                 )}
                                 {isSuperAdmin && (
+                                  <>
                                     <NavLink to="/admin" onClick={() => setIsAdminDropdownOpen(false)} className={dropdownItemClass}>
                                         Areas and Administrators
                                     </NavLink>
+                                  </>
                                 )}
                             </div>
                         )}
                   </div>
                 )}
+                {isSuperAdmin && (
+                  <NavLink
+                    to="/superadmin"
+                    className={({ isActive }) => `${navItemClass} ${isActive ? activeNavItemClass : ''}`}
+                  >
+                    Faculty Appeals
+                  </NavLink>
+                )}
 
-                {/* Notifications */}
                 <div className="px-2">
                     <NotificationBell />
                 </div>
                 
-                {/* Account Dropdown - Icon based */}
                 <div className="relative h-full flex items-center" ref={accountDropdownRef}>
                     <button 
                         onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
@@ -191,7 +189,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-4">
              {user && variant === 'main' && <NotificationBell />}
             <button
@@ -208,7 +205,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
         </div>
       </nav>
 
-      {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white absolute w-full shadow-lg z-50" id="mobile-menu">
           <div className="py-2">
@@ -216,7 +212,6 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
               <>
                  <NavLink to="/" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Home</NavLink>
                 
-                {/* User & Faculty-specific links */}
                 {(isUser || isFaculty) && (
                   <>
                     <NavLink to="/catalog" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Catalog</NavLink>
@@ -224,13 +219,14 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                   </>
                 )}
 
-                {/* Faculty-specific links */}
                 {isFaculty && (
                     <NavLink to="/my-endorsements" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>My Endorsements</NavLink>
                 )}
+                 {isSuperAdmin && (
+                  <NavLink to="/superadmin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Faculty Appeals</NavLink>
+                )}
 
-                {/* Admin-specific links */}
-                {(isAdmin || isSuperAdmin) && (
+                {(isAdmin) && (
                   <>
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Management</div>
                     <NavLink to="/all-requests" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Reservations</NavLink>
@@ -239,14 +235,15 @@ const Header: React.FC<{ variant?: 'main' | 'auth' }> = ({ variant = 'main' }) =
                         <NavLink to="/settings" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Area Settings</NavLink>
                     )}
                     {isSuperAdmin && (
-                         <NavLink to="/admin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>
-                            Areas and Administrators
-                        </NavLink>
+                        <>
+                            <NavLink to="/admin" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>
+                                Areas and Administrators
+                            </NavLink>
+                        </>
                     )}
                   </>
                 )}
 
-                {/* Common links for all logged-in users */}
                 <div className="border-t-4 border-gray-100 mt-2">
                     <div className="px-5 py-2 text-[11px] font-bold text-ccad-text-secondary uppercase tracking-wider bg-gray-50">Account</div>
                     <NavLink to="/profile" target="_self" className={mobileLinkClass} onClick={() => setIsMenuOpen(false)}>Settings</NavLink>

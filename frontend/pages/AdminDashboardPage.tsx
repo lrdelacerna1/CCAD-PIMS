@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import SuperAdminDashboard from '../components/admin/SuperAdminDashboard';
 import StandardAdminDashboard from '../components/admin/StandardAdminDashboard';
+import FacultyAppeals from '../components/admin/FacultyAppeals';
 
 const AdminDashboardPage: React.FC = () => {
     const { user } = useAuth();
@@ -14,6 +16,7 @@ const AdminDashboardPage: React.FC = () => {
                 {isSuperAdmin ? 'Areas and Administrators' : 'Admin Dashboard'}
             </h1>
             {isSuperAdmin && <SuperAdminDashboard />}
+            {isSuperAdmin && <FacultyAppeals />}
             {user?.role === 'admin' && <StandardAdminDashboard />}
         </div>
     );

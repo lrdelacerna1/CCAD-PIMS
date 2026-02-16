@@ -153,3 +153,12 @@ export interface LatePenaltyFeeRule {
 export interface LatePenaltyFeeSettings {
     rules: LatePenaltyFeeRule[];
 }
+
+export interface FacultyAppeal {
+    id: string;
+    uid: string;
+    email: string;
+    name: string;
+    reason: string;
+    status: 'pending' | 'approved' | 'rejected';
+}

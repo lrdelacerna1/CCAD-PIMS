@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -9,10 +8,12 @@ import { AuthLayout } from '../components/layout/AuthLayout';
 import { MailIcon, LockIcon, UserIcon, GoogleIcon, PhoneIcon, AcademicCapIcon, BriefcaseIcon } from '../components/Icons';
 import { UserRole } from '../types';
 import { Select } from '../components/ui/Select';
+import RoleSelectionModal from '../components/auth/RoleSelectionModal';
+import { appealService } from '../services/appealService';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { register, signInWithGoogle } = useAuth();
+  const { register, signUpWithGoogle, updateProfile, user } = useAuth();
 
   const [userType, setUserType] = useState<UserRole>('student');
   const [email, setEmail] = useState('');
@@ -27,6 +28,8 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [showPendingNotification, setShowPendingNotification] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,14 +52,16 @@ const RegisterPage: React.FC = () => {
             firstName,
             lastName,
             contactNumber,
-            role: userType,
+            role: userType, // Faculty gets 'faculty' role directly for manual registration
         };
 
         if (userType === 'student') {
             userData = { ...userData, studentId, program };
         }
 
+        // Manual registration - faculty role is approved immediately
         await register(userData);
+
         navigate('/verify-email');
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration.');
@@ -69,8 +74,16 @@ const RegisterPage: React.FC = () => {
     setError('');
     setIsGoogleLoading(true);
     try {
-      await signInWithGoogle();
-      navigate('/verify-email');
+      const firebaseUser = await signUpWithGoogle();
+      
+      if (firebaseUser?.email?.endsWith('@up.edu.ph')) {
+        // Show role selection modal for UP emails
+        setIsRoleModalOpen(true);
+      } else {
+        // Non-UP emails are automatically guests
+        await updateProfile({ role: 'guest' });
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to create account with Google.');
     } finally {
@@ -78,8 +91,88 @@ const RegisterPage: React.FC = () => {
     }
   };
 
+  const handleRoleSelection = async (role: 'student' | 'faculty') => {
+    setIsRoleModalOpen(false);
+    if (!user) {
+        setError('User not found. Please try again.');
+        return;
+    }
+    try {
+        if (role === 'student') {
+            await updateProfile({ role: 'student' });
+            navigate('/');
+        } else { // faculty - Google sign-in goes through appeal process
+            await appealService.createFacultyAppeal(
+                user.id, 
+                user.emailAddress, 
+                user.firstName, 
+                user.lastName
+            );
+            await updateProfile({ role: 'pending-faculty' });
+            
+            // Show pending notification
+            setShowPendingNotification(true);
+        }
+    } catch (error) {
+        setError('Failed to update role. Please try again.');
+    }
+  };
+
+  const handlePendingNotificationClose = () => {
+    setShowPendingNotification(false);
+    navigate('/');
+  };
+
   return (
     <AuthLayout>
+      <RoleSelectionModal 
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        onSelectRole={handleRoleSelection}
+      />
+
+      {/* Pending Faculty Notification Modal */}
+      {showPendingNotification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex flex-col items-center text-center">
+              {/* Icon */}
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Faculty Access Pending
+              </h3>
+
+              {/* Message */}
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
+                Your faculty appeal has been submitted successfully. You are currently a <strong>pending faculty</strong> member. 
+                A super administrator will review and approve your request soon.
+              </p>
+
+              {/* Status Badge */}
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3 mb-6 w-full">
+                <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                  ⏳ Status: Awaiting Approval
+                </p>
+              </div>
+
+              {/* Button */}
+              <Button 
+                onClick={handlePendingNotificationClose}
+                className="w-full"
+              >
+                Continue to Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="w-full sm:max-w-xl">
         <h1 className="text-xl font-bold leading-tight tracking-tight text-gray-900 md:text-2xl dark:text-white font-heading text-center mb-4">
           Create a New Account
