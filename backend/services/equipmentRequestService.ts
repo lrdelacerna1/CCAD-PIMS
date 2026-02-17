@@ -174,6 +174,14 @@ export const EquipmentRequestService = {
             });
         }
 
+        if (status === 'Cancelled') {
+            await notifyAdmins(
+                request.areaId,
+                "Equipment Request Cancelled",
+                `${request.userName}'s equipment request for "${request.purpose}" has been cancelled.`
+            );
+        }
+        
         // Endorsement flow → now pending admin approval
         if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval') {
             if (request.endorserEmail) {
@@ -248,6 +256,14 @@ export const EquipmentRequestService = {
                     isRead: false,
                     link: "/my-reservations"
                 });
+            }
+
+            if (status === 'Cancelled') {
+                await notifyAdmins(
+                    req.areaId,
+                    "Equipment Request Cancelled",
+                    `${req.userName}'s equipment request for "${req.purpose}" has been cancelled.`
+                );
             }
 
             if (req.status === 'Pending Endorsement' && status === 'Pending Approval') {

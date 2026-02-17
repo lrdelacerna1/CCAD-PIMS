@@ -179,6 +179,15 @@ export const RoomRequestService = {
             });
         }
 
+        // Notify admins when a room request is cancelled
+        if (status === 'Cancelled') {
+            await notifyAdmins(
+                request.areaId,
+                "Room Request Cancelled",
+                `${request.userName}'s room request for "${request.purpose}" has been cancelled.`
+            );
+        }
+
         // Endorsement flow → now pending admin approval
         if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval') {
             if (request.endorserEmail) {
@@ -253,6 +262,15 @@ export const RoomRequestService = {
                     isRead: false,
                     link: "/my-reservations"
                 });
+            }
+
+            // Notify admins when a room request is cancelled
+            if (status === 'Cancelled') {
+                await notifyAdmins(
+                    req.areaId,
+                    "Room Request Cancelled",
+                    `${req.userName}'s room request for "${req.purpose}" has been cancelled.`
+                );
             }
 
             if (req.status === 'Pending Endorsement' && status === 'Pending Approval') {
