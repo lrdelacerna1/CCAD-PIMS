@@ -173,6 +173,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || 'User',
                 createdAt: new Date().toISOString(),
                 lastLogin: new Date().toISOString(),
+                name: '',
+                email: ''
             };
             
             await setDoc(userDocRef, newUser);

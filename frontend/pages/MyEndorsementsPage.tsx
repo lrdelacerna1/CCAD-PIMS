@@ -168,7 +168,7 @@ const MyEndorsementsPage: React.FC = () => {
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
     const getRequestAreaId = (req: AnyRequest): string => {
-        if ('requestedItems' in req) return req.requestedItems[0]?.areaId || '';
+        if ('requestedItems' in req) return req.areaId || '';
         if ('requestedRoom' in req) {
             const room = req.requestedRoom;
             if (Array.isArray(room)) return room[0]?.areaId || '';

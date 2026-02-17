@@ -56,7 +56,7 @@ const RequestsTable: React.FC<{
     const getAreaName = (req: AnyRequest) => {
         let areaId = '';
         if ('requestedItems' in req) {
-            areaId = req.requestedItems[0]?.areaId;
+            areaId = req.areaId;
         } else {
              if ('areaId' in req && (req as any).areaId) {
                  areaId = (req as any).areaId;
@@ -323,7 +323,7 @@ const MyReservationsPage: React.FC = () => {
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
     const getAreaIdForFilter = (req: AnyRequest) => {
-        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0].areaId;
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.areaId;
         if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
         if ('requestedRoom' in req) {
              const rr = (req as any).requestedRoom;

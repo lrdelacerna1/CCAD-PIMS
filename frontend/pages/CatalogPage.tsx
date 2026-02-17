@@ -15,6 +15,10 @@ import { getInventoryCatalogApi } from '../../backend/api/inventory';
 import { getRoomCatalogApi } from '../../backend/api/rooms';
 import { getSettingsApi } from '../../backend/api/settings';
 
+// Explicit cart value types so TypeScript never widens to unknown
+type EquipmentCartEntry = { item: InventoryItemForCatalog; instances: Map<string, InventoryInstance> };
+type RoomCartEntry = { type: RoomTypeForCatalog; instance: RoomInstance };
+
 const CatalogPage: React.FC = () => {
     const location = useLocation();
     const [activeTab, setActiveTab] = useState<'equipment' | 'rooms'>(
@@ -35,13 +39,12 @@ const CatalogPage: React.FC = () => {
 
     const [startDate, setStartDate] = useState(minDate);
     const [endDate, setEndDate] = useState(minDate);
-
     const [startTime, setStartTime] = useState('08:00');
     const [endTime, setEndTime] = useState('17:00');
     const [isWholeDay, setIsWholeDay] = useState(false);
 
-    const [equipmentCart, setEquipmentCart] = useState<Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>>(new Map());
-    const [roomCart, setRoomCart] = useState<Map<string, { type: RoomTypeForCatalog, instance: RoomInstance }>>(new Map());
+    const [equipmentCart, setEquipmentCart] = useState<Map<string, EquipmentCartEntry>>(new Map());
+    const [roomCart, setRoomCart] = useState<Map<string, RoomCartEntry>>(new Map());
 
     const activeCart = activeTab === 'equipment' ? equipmentCart : roomCart;
     const { availability, isLoading: isAvailabilityLoading, isCartSubmittable } = useCartAvailability(activeCart, startDate, endDate, activeTab);
@@ -49,7 +52,6 @@ const CatalogPage: React.FC = () => {
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [viewingItem, setViewingItem] = useState<InventoryItemForCatalog | RoomTypeForCatalog | null>(null);
     const [selectingInstancesFor, setSelectingInstancesFor] = useState<InventoryItemForCatalog | RoomTypeForCatalog | null>(null);
-
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -78,7 +80,6 @@ const CatalogPage: React.FC = () => {
             setError('The end date cannot be earlier than the start date. Please adjust your dates and try again.');
             return;
         }
-
         setIsLoading(true);
         setError('');
         try {
@@ -96,34 +97,29 @@ const CatalogPage: React.FC = () => {
         }
     }, [startDate, endDate, activeTab, startTime, endTime, isWholeDay]);
 
-    useEffect(() => {
-        fetchCatalogData();
-    }, [fetchCatalogData]);
-
-    useEffect(() => {
-        setEquipmentCart(new Map());
-        setRoomCart(new Map());
-    }, [activeTab]);
+    useEffect(() => { fetchCatalogData(); }, [fetchCatalogData]);
+    useEffect(() => { setEquipmentCart(new Map()); setRoomCart(new Map()); }, [activeTab]);
 
     const totalItemCount = useMemo(() => {
         if (activeTab === 'equipment') {
-            return (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[])
-                .reduce((sum: number, group) => sum + group.instances.size, 0);
+            return Array.from(equipmentCart.values())
+                .reduce((sum, group) => sum + group.instances.size, 0);
         }
         return roomCart.size;
     }, [equipmentCart, roomCart, activeTab]);
 
-    const handleInstancesSelected = (item: InventoryItemForCatalog | RoomTypeForCatalog, instances: (InventoryInstance | RoomInstance)[]) => {
+    const handleInstancesSelected = (
+        item: InventoryItemForCatalog | RoomTypeForCatalog,
+        instances: (InventoryInstance | RoomInstance)[]
+    ) => {
         if (instances.length === 0) return;
 
         if ('serialNumber' in instances[0]) {
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
-                const group = (newCart.get(item.id) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined)
+                const group: EquipmentCartEntry = newCart.get(item.id)
                     || { item: item as InventoryItemForCatalog, instances: new Map() };
-                (instances as InventoryInstance[]).forEach(inst => {
-                    group.instances.set(inst.id, inst);
-                });
+                (instances as InventoryInstance[]).forEach(inst => group.instances.set(inst.id, inst));
                 newCart.set(item.id, group);
                 return newCart;
             });
@@ -143,7 +139,7 @@ const CatalogPage: React.FC = () => {
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
                 if (instanceId) {
-                    const group = newCart.get(itemId) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined;
+                    const group = newCart.get(itemId);
                     if (group) {
                         group.instances.delete(instanceId);
                         if (group.instances.size === 0) newCart.delete(itemId);
@@ -167,8 +163,6 @@ const CatalogPage: React.FC = () => {
         }
     };
 
-    const handleCloseRequestModal = () => setIsRequestModalOpen(false);
-
     const handleSuccessRequest = () => {
         setIsRequestModalOpen(false);
         if (activeTab === 'equipment') setEquipmentCart(new Map());
@@ -177,7 +171,6 @@ const CatalogPage: React.FC = () => {
     };
 
     const handleViewDetailsClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => setViewingItem(item);
-
     const handleSelectInstancesClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => {
         setViewingItem(null);
         setSelectingInstancesFor(item);
@@ -186,11 +179,23 @@ const CatalogPage: React.FC = () => {
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
 
+    // Pre-compute typed room cart entries to avoid unknown inference at usage sites
+    const roomCartEntries = useMemo(
+        (): RoomCartEntry[] => Array.from(roomCart.values()),
+        [roomCart]
+    );
+
+    const equipmentCartEntries = useMemo(
+        (): EquipmentCartEntry[] => Array.from(equipmentCart.values()),
+        [equipmentCart]
+    );
+
     return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
             <aside className={`fixed inset-y-0 right-0 z-50 w-full ${isSidebarCollapsed ? 'sm:w-16 lg:w-16' : 'sm:w-60 lg:w-60'} lg:relative transition-all duration-300 transform ${isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
                 <Cart
-                    items={activeCart}
+                    equipmentItems={equipmentCart}
+                    roomItems={roomCart}
                     availability={availability}
                     isLoading={isAvailabilityLoading}
                     isSubmittable={isCartSubmittable}
@@ -232,16 +237,10 @@ const CatalogPage: React.FC = () => {
 
                 <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                     <nav className="-mb-px flex space-x-8">
-                        <button
-                            onClick={() => setActiveTab('equipment')}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}
-                        >
+                        <button onClick={() => setActiveTab('equipment')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}>
                             Equipment
                         </button>
-                        <button
-                            onClick={() => setActiveTab('rooms')}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'rooms' ? activeTabClasses : inactiveTabClasses}`}
-                        >
+                        <button onClick={() => setActiveTab('rooms')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'rooms' ? activeTabClasses : inactiveTabClasses}`}>
                             Rooms
                         </button>
                     </nav>
@@ -290,10 +289,10 @@ const CatalogPage: React.FC = () => {
                     onConfirm={handleInstancesSelected}
                     alreadySelectedIds={new Set(
                         activeTab === 'equipment'
-                            ? (equipmentCart.get(selectingInstancesFor.id)?.instances.keys() || [])
-                            : Array.from(roomCart.values())
-                                .filter(cartItem => cartItem.type.id === selectingInstancesFor.id)
-                                .map(cartItem => cartItem.instance.id)
+                            ? Array.from(equipmentCart.get(selectingInstancesFor.id)?.instances.keys() ?? [])
+                            : roomCartEntries
+                                .filter(entry => entry.type.id === selectingInstancesFor.id)
+                                .map(entry => entry.instance.id)
                     )}
                 />
             )}
@@ -302,13 +301,15 @@ const CatalogPage: React.FC = () => {
                 activeTab === 'equipment' ? (
                     <NewEquipmentRequestModal
                         areas={areas}
-                        onClose={handleCloseRequestModal}
+                        onClose={() => setIsRequestModalOpen(false)}
                         onSuccess={handleSuccessRequest}
                         items={new Map(
-                            (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[])
-                                .flatMap(group =>
-                                    Array.from(group.instances.values()).map(inst => [inst.id, { item: group.item, instance: inst }])
-                                )
+                            equipmentCartEntries.flatMap(group =>
+                                Array.from(group.instances.values()).map(inst => [
+                                    inst.id,
+                                    { item: group.item, instance: inst }
+                                ])
+                            )
                         )}
                         startDate={startDate}
                         endDate={endDate}
@@ -318,7 +319,7 @@ const CatalogPage: React.FC = () => {
                     roomCart.size > 0 && (
                         <NewRoomRequestModal
                             areas={areas}
-                            onClose={handleCloseRequestModal}
+                            onClose={() => setIsRequestModalOpen(false)}
                             onSuccess={handleSuccessRequest}
                             rooms={roomCart}
                             startDate={startDate}

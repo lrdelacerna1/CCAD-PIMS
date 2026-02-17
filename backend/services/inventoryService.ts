@@ -20,7 +20,7 @@ import {
     AvailabilityStatus,
     InventoryInstanceCondition,
     InventoryInstanceStatus
-} from '../../lib/types';
+} from '../../frontend/types';
 
 interface InventoryItemForCatalog extends InventoryItemWithQuantity {
     availabilityStatus: string;

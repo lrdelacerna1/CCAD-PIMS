@@ -21,7 +21,7 @@ import {
     RoomInstanceAvailabilityResult,
     RoomStatus,
     RoomCondition
-} from '../../lib/types';
+} from '../../frontend/types';
 
 interface RoomTypeForCatalog extends RoomTypeWithQuantity {
     availabilityStatus: string;

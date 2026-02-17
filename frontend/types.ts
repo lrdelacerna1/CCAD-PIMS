@@ -13,7 +13,11 @@ export interface User {
     lastName?: string;
     emailAddress?: string;
     emailVerified?: boolean;
-    managedAreaIds?: string[]; // ADD THIS
+    managedAreaIds?: string[];
+    createdAt?: string;   // ISO string
+    lastLogin?: string;   // ISO string
+    contactNumber?: string;   // ← add this
+    idNumber?: string;        // ← add this
 }
 
 export interface Area {
@@ -33,6 +37,14 @@ export interface Area {
 
 export type InventoryInstanceStatus = 'Available' | 'Reserved' | 'Under Maintenance';
 export type InventoryInstanceCondition = 'Good' | 'Damaged' | 'Lost/Unusable';
+
+export type AvailabilityStatus =
+    | 'Available'
+    | 'Unavailable'
+    | 'Unavailable: On Hold'
+    | 'Unavailable: Reserved'
+    | 'Unavailable: Under Maintenance'
+    | 'Unavailable: No Instances';
 
 export interface InventoryItem {
     id: string;
@@ -67,6 +79,11 @@ export interface InventoryInstance {
     blockedDates?: string[];
 }
 
+export interface InventoryItemForCatalog extends InventoryItemWithQuantity {
+    availabilityStatus: AvailabilityStatus;
+    availableForDates: number;
+    conditionSummary?: Partial<Record<InventoryInstanceCondition, number>>;
+}
 
 // --- ROOMS --- //
 
@@ -102,6 +119,11 @@ export interface RoomInstance {
     features?: string[];
     photoUrls?: string[];
     blockedDates?: string[];
+}
+
+export interface RoomTypeForCatalog extends RoomTypeWithQuantity {
+    availabilityStatus: AvailabilityStatus;
+    availableForDates: number;
 }
 
 
@@ -140,6 +162,9 @@ export interface EquipmentRequest {
     areaId: string;
     returnDate?: string;
     equipmentName?: string;
+    requestedStartTime?: string;  // ← add this
+    requestedEndTime?: string;    // ← add this
+    isWholeDay?: boolean;         // ← add this
 }
 
 export const AllRoomRequestStatuses = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Rejected', 'Ready for Check-in', 'In Use', 'Completed', 'Overdue', 'Cancelled'] as const;
@@ -166,6 +191,9 @@ export interface RoomRequest {
     areaId: string;
     returnDate?: string;
     roomName?: string;
+    requestedStartTime?: string;  // e.g. '08:00'
+    requestedEndTime?: string;    // e.g. '17:00'
+    isWholeDay?: boolean;
 }
 
 export interface Reservation {
@@ -197,23 +225,29 @@ export interface RoomInstanceAvailabilityResult {
 
 // --- OTHER --- //
 
+
 export interface Notification {
     id: string;
     userId: string;
     title: string;
     message: string;
     isRead: boolean;
-    createdAt: string; // ISO string
-    link?: string; // Optional link to navigate to
+    createdAt: string;
+    link?: string;
 }
 
 export interface Penalty {
-  id: string;
-  userId: string;
-  reason: string;
-  amount: number;
-  isPaid: boolean;
-  requestId: string;
-  requestType: 'equipment' | 'room';
-  createdAt: string; // ISO string
+    id: string;
+    userId: string;
+    reason: string;
+    amount: number;
+    isPaid: boolean;
+    requestId: string;
+    requestType: 'equipment' | 'room';
+    createdAt: string;
+}
+
+export interface ReservationSettings {
+    minimumLeadDays: number;
+    // Add other settings fields here as needed
 }

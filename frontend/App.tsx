@@ -42,7 +42,7 @@ const AppContent: React.FC = () => {
     return <div className="flex justify-center items-center h-screen"><p>Loading...</p></div>;
   }
 
-  if (user && user.role === 'pending-role' && !roleSelected) {
+  if (user && user.role === 'pending-faculty' && !roleSelected) {
     return <RoleSelectionModal user={user} onRoleSelected={handleRoleSelected} />;
   }
 

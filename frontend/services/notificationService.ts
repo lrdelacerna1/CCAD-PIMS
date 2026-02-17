@@ -3,12 +3,13 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, up
 import { Notification } from '../types';
 
 const createNotification = async (
-  userId: string, 
-  message: string, 
+  userId: string,
+  message: string,
   link?: string,
   title?: string
 ): Promise<Notification> => {
   try {
+    const now = new Date().toISOString();
     const docRef = await addDoc(collection(db, 'notifications'), {
       userId,
       title: title || 'New Notification',
@@ -17,16 +18,16 @@ const createNotification = async (
       isRead: false,
       createdAt: serverTimestamp(),
     });
-    
-    return { 
-      id: docRef.id, 
-      userId, 
+
+    return {
+      id: docRef.id,
+      userId,
       title: title || 'New Notification',
-      message, 
-      isRead: false, 
-      createdAt: new Date(),
-      link: link || undefined
-    } as Notification;
+      message,
+      isRead: false,
+      createdAt: now,           // ISO string — matches Notification.createdAt: string
+      link: link || undefined,
+    };
   } catch (error) {
     console.error("Error creating notification:", error);
     throw new Error('Failed to create notification.');
@@ -36,23 +37,24 @@ const createNotification = async (
 const getNotificationsForUser = async (userId: string): Promise<Notification[]> => {
   try {
     const q = query(
-      collection(db, 'notifications'), 
-      where('userId', '==', userId), 
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
     const notifications: Notification[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      notifications.push({ 
-        id: doc.id, 
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const rawDate = data.createdAt?.toDate?.() as Date | undefined;
+      notifications.push({
+        id: docSnap.id,
         userId: data.userId,
         title: data.title || 'Notification',
         message: data.message,
         isRead: data.isRead || false,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        link: data.link || undefined
-      } as Notification);
+        createdAt: rawDate ? rawDate.toISOString() : new Date().toISOString(),
+        link: data.link || undefined,
+      });
     });
     return notifications;
   } catch (error) {
@@ -76,8 +78,8 @@ const getSuperAdmins = async (): Promise<string[]> => {
     const q = query(collection(db, 'users'), where('role', '==', 'superadmin'));
     const querySnapshot = await getDocs(q);
     const superAdminIds: string[] = [];
-    querySnapshot.forEach((doc) => {
-      superAdminIds.push(doc.id);
+    querySnapshot.forEach((docSnap) => {
+      superAdminIds.push(docSnap.id);
     });
     return superAdminIds;
   } catch (error) {
