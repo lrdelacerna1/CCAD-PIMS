@@ -37,7 +37,7 @@ const CatalogPage: React.FC = () => {
     const [endDate, setEndDate] = useState(minDate);
 
     const [equipmentCart, setEquipmentCart] = useState<Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>>(new Map());
-    const [roomCart, setRoomCart] = useState<{ type: RoomTypeForCatalog, instance: RoomInstance } | null>(null);
+    const [roomCart, setRoomCart] = useState<Map<string, { type: RoomTypeForCatalog, instance: RoomInstance }>>(new Map());
 
     const activeCart = activeTab === 'equipment' ? equipmentCart : roomCart;
     const { availability, isLoading: isAvailabilityLoading, isCartSubmittable } = useCartAvailability(activeCart, startDate, endDate, activeTab);
@@ -49,29 +49,25 @@ const CatalogPage: React.FC = () => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
-    // Effect for fetching static data like areas and settings once
     useEffect(() => {
         const fetchStaticData = async () => {
             try {
-                console.log('Fetching static data: areas and settings...');
                 const [areasData, settingsData] = await Promise.all([
                     getAreasApi(),
                     getSettingsApi(),
                 ]);
-                console.log('Fetched areas:', areasData);
-                setAreas(areasData);
-                console.log('Fetched settings:', settingsData);
-                setSettings(settingsData);
+                setAreas(areasData || []);
+                setSettings(settingsData || null);
             } catch (err) {
-                console.error('Error fetching static data:', err);
                 setError('Failed to load page essentials.');
+                setAreas([]);
+                setSettings(null);
             }
         };
         fetchStaticData();
     }, []);
 
-    // Effect for fetching catalog data when dates or tab change
-useEffect(() => {
+    useEffect(() => {
     const fetchCatalogData = async () => {
         if (new Date(endDate) < new Date(startDate)) {
             setEquipmentInventory([]);
@@ -83,22 +79,17 @@ useEffect(() => {
         setIsLoading(true);
         setError('');
         try {
-            console.log(`Fetching catalog data for tab: ${activeTab}, from ${startDate} to ${endDate}`);
             if (activeTab === 'equipment') {
                 const inventoryData = await getInventoryCatalogApi(startDate, endDate);
-                console.log('Fetched equipment data:', inventoryData);
-                setEquipmentInventory(inventoryData);
+                setEquipmentInventory(inventoryData || []);
             } else {
                 const roomData = await getRoomCatalogApi(startDate, endDate);
-                console.log('Fetched room data:', roomData);
-                setRoomInventory(roomData);
+                setRoomInventory(roomData || []);
             }
         } catch (err) {
-            console.error('Error fetching catalog data:', err);
             setError('Failed to load catalog data.');
         } finally {
             setIsLoading(false);
-            console.log('Finished fetching catalog data.');
         }
     };
 
@@ -107,20 +98,20 @@ useEffect(() => {
 
     useEffect(() => {
         setEquipmentCart(new Map());
-        setRoomCart(null);
+        setRoomCart(new Map());
     }, [activeTab]);
 
     const totalItemCount = useMemo(() => {
         if (activeTab === 'equipment') {
             return (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]).reduce((sum: number, group) => sum + group.instances.size, 0);
         }
-        return roomCart ? 1 : 0;
+        return roomCart.size;
     }, [equipmentCart, roomCart, activeTab]);
 
     const handleInstancesSelected = (item: InventoryItemForCatalog | RoomTypeForCatalog, instances: (InventoryInstance | RoomInstance)[]) => {
         if (instances.length === 0) return;
 
-        if ('serialNumber' in instances[0]) { // Equipment
+        if ('serialNumber' in instances[0]) {
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
                 const group = (newCart.get(item.id) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined) || { item: item as InventoryItemForCatalog, instances: new Map() };
@@ -130,8 +121,14 @@ useEffect(() => {
                 newCart.set(item.id, group);
                 return newCart;
             });
-        } else { // Room
-            setRoomCart({ type: item as RoomTypeForCatalog, instance: instances[0] as RoomInstance });
+        } else {
+            setRoomCart(prev => {
+                const newCart = new Map(prev);
+                (instances as RoomInstance[]).forEach(inst => {
+                    newCart.set(inst.id, { type: item as RoomTypeForCatalog, instance: inst });
+                });
+                return newCart;
+            });
         }
     };
     
@@ -150,8 +147,12 @@ useEffect(() => {
                 }
                 return newCart;
             });
-        } else {
-            setRoomCart(null);
+        } else if (instanceId) {
+            setRoomCart(prev => {
+                const newCart = new Map(prev);
+                newCart.delete(instanceId);
+                return newCart;
+            });
         }
     };
 
@@ -167,8 +168,7 @@ useEffect(() => {
     const handleSuccessRequest = () => {
         setIsRequestModalOpen(false);
         if (activeTab === 'equipment') setEquipmentCart(new Map());
-        else setRoomCart(null);
-        // No need to call fetch, the useEffect will handle it when dates change or tab switches.
+        else setRoomCart(new Map());
     };
 
     const handleViewDetailsClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => setViewingItem(item);
@@ -255,7 +255,7 @@ useEffect(() => {
                         error={error}
                         onSelectInstances={handleSelectInstancesClick}
                         onViewDetailsClick={handleViewDetailsClick}
-                        isRoomInCart={!!roomCart}
+                        cartedInstanceIds={new Set(roomCart.keys())}
                     />
                 )}
             </main>
@@ -267,7 +267,7 @@ useEffect(() => {
                     areaName={areas.find(a => a.id === viewingItem.areaId)?.name || 'N/A'}
                     onClose={() => setViewingItem(null)}
                     onSelectInstances={() => handleSelectInstancesClick(viewingItem)}
-                    isInCart={activeTab === 'equipment' ? equipmentCart.has(viewingItem.id) : !!roomCart}
+                    isInCart={activeTab === 'equipment' ? equipmentCart.has(viewingItem.id) : false}
                     startDate={startDate}
                     endDate={endDate}
                 />
@@ -283,7 +283,8 @@ useEffect(() => {
                     alreadySelectedIds={new Set(
                         activeTab === 'equipment' 
                             ? (equipmentCart.get(selectingInstancesFor.id)?.instances.keys() || [])
-                            : (roomCart?.instance.id ? [roomCart.instance.id] : [])
+                            // Check if the item being selected is of the same type as what's in the cart, then get the instance ids
+                            : (Array.from(roomCart.values()).filter(cartItem => cartItem.type.id === selectingInstancesFor.id).map(cartItem => cartItem.instance.id))
                     )}
                 />
             )}
@@ -302,12 +303,12 @@ useEffect(() => {
                         minimumLeadDays={settings?.minimumLeadDays ?? 2}
                     />
                 ) : (
-                    roomCart && (
+                    roomCart.size > 0 && (
                         <NewRoomRequestModal
                             areas={areas}
                             onClose={handleCloseRequestModal}
                             onSuccess={handleSuccessRequest}
-                            cartItem={roomCart}
+                            rooms={roomCart}
                             startDate={startDate}
                             endDate={endDate}
                             minimumLeadDays={settings?.minimumLeadDays ?? 2}

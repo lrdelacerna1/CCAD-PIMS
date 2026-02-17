@@ -2,9 +2,11 @@ import React, { useMemo } from 'react';
 import { InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { ShoppingCartIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, XIcon } from '../Icons';
+import { ShoppingCartIcon, ChevronDoubleLeftIcon, XIcon } from '../Icons';
 
-type CartData = Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }> | { type: RoomTypeForCatalog, instance: RoomInstance } | null;
+type EquipmentCartData = Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>;
+type RoomCartData = Map<string, { type: RoomTypeForCatalog, instance: RoomInstance }>;
+type CartData = EquipmentCartData | RoomCartData;
 
 interface CartProps {
     items: CartData;
@@ -31,23 +33,17 @@ export const Cart: React.FC<CartProps> = ({
 }) => {
     
     const isEquipment = type === 'equipment' && items instanceof Map;
-    const isRoom = type === 'rooms' && items && !(items instanceof Map);
+    const isRoom = type === 'rooms' && items instanceof Map;
 
-    const equipmentItemGroups = useMemo<{ item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]>(() => {
-        if (isEquipment && items instanceof Map) {
-            return Array.from(items.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[];
-        }
-        return [];
+    const equipmentItemGroups = useMemo(() => {
+        return isEquipment ? Array.from((items as EquipmentCartData).values()) : [];
     }, [isEquipment, items]);
 
-    const roomItem = isRoom ? items as { type: RoomTypeForCatalog, instance: RoomInstance } : null;
+    const roomItems = useMemo(() => {
+        return isRoom ? Array.from((items as RoomCartData).values()) : [];
+    }, [isRoom, items]);
     
-    const totalItemCount = useMemo(() => {
-        if (isEquipment && items instanceof Map) {
-            return Array.from(items.values()).reduce((sum, group: { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }) => sum + group.instances.size, 0);
-        }
-        return isRoom ? 1 : 0;
-    }, [items, isEquipment, isRoom]);
+    const totalItemCount = items.size;
 
     if (isCollapsed) {
         return (
@@ -109,12 +105,11 @@ export const Cart: React.FC<CartProps> = ({
                                 <p className="font-semibold text-slate-800 dark:text-slate-200">{item.name} ({instances.size})</p>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {Array.from(instances.values()).map((inst) => {
-                                        const i = inst as InventoryInstance;
-                                        const isAvailable = availability.get(i.id) ?? true;
+                                        const isAvailable = availability.get(inst.id) ?? true;
                                         return (
-                                        <div key={i.id} className={`flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border ${isAvailable ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200' : 'bg-rose-50 dark:bg-rose-900/40 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200'}`}>
-                                            {i.serialNumber}
-                                            <button onClick={() => onRemove(item.id, i.id)} className="rounded-full w-4 h-4 flex items-center justify-center bg-slate-200 dark:bg-slate-600 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-500">
+                                        <div key={inst.id} className={`flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border ${isAvailable ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200' : 'bg-rose-50 dark:bg-rose-900/40 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200'}`}>
+                                            {inst.serialNumber}
+                                            <button onClick={() => onRemove(item.id, inst.id)} className="rounded-full w-4 h-4 flex items-center justify-center bg-slate-200 dark:bg-slate-600 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-500">
                                                 &times;
                                             </button>
                                         </div>
@@ -122,22 +117,22 @@ export const Cart: React.FC<CartProps> = ({
                                 </div>
                             </div>
                         ))}
-                         {isRoom && roomItem && (() => {
-                            const isAvailable = availability.get(roomItem.instance.id) ?? true;
+                         {isRoom && roomItems.map(({ type, instance }) => {
+                            const isAvailable = availability.get(instance.id) ?? true;
                             return (
-                                <div className={`p-3 rounded-md ${isAvailable ? 'bg-slate-50 dark:bg-slate-700/50' : 'bg-rose-50 dark:bg-rose-900/40'}`}>
-                                    <p className="font-semibold text-slate-800 dark:text-slate-200">{roomItem.type.name}</p>
+                                <div key={instance.id} className={`p-3 rounded-md ${isAvailable ? 'bg-slate-50 dark:bg-slate-700/50' : 'bg-rose-50 dark:bg-rose-900/40'}`}>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">{type.name}</p>
                                     <div className="mt-2 flex">
                                         <div className={`flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border ${isAvailable ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200' : 'bg-rose-50 dark:bg-rose-900/40 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200'}`}>
-                                            {roomItem.instance.name}
-                                            <button onClick={() => onRemove(roomItem.type.id, roomItem.instance.id)} className="rounded-full w-4 h-4 flex items-center justify-center bg-slate-200 dark:bg-slate-600 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-500">
+                                            {instance.name}
+                                            <button onClick={() => onRemove(type.id, instance.id)} className="rounded-full w-4 h-4 flex items-center justify-center bg-slate-200 dark:bg-slate-600 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-500">
                                                 &times;
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                             );
-                         })()}
+                         })}
                     </div>
                 )}
             </div>

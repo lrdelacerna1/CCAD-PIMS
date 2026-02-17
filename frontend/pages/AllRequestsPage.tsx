@@ -113,6 +113,21 @@ const AllRequestsPage: React.FC = () => {
     const areasMap = useMemo(() => new Map(areas.map(area => [area.id, area.name])), [areas]);
     const getAreaId = (req: AnyRequest) => {
         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
+        if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
+        
+        // Handle new room request structure where requestedRoom is an array
+        if ('requestedRoom' in req) {
+            const rr = (req as any).requestedRoom;
+            if (Array.isArray(rr) && rr.length > 0 && rr[0].areaId) {
+                return rr[0].areaId;
+            }
+             // Handle legacy room request structure where requestedRoom is an object? 
+             // (Assuming based on RequestManagementTable usage, though not seen in NewRoomRequestModal)
+             if (!Array.isArray(rr) && rr && rr.areaId) {
+                 return rr.areaId;
+             }
+        }
+        
         if ('roomTypeId' in req) {
              const roomType = areas.find(area => area.id === req.roomTypeId);
              return roomType ? roomType.id : '';
@@ -131,7 +146,8 @@ const AllRequestsPage: React.FC = () => {
         if (activeTab === 'equipment') {
             processed = processed.filter(r => 'requestedItems' in r);
         } else if (activeTab === 'room') {
-            processed = processed.filter(r => 'roomTypeId' in r);
+            // Check for roomTypeId OR requestedRoom to support both legacy and new room requests
+            processed = processed.filter(r => 'roomTypeId' in r || 'requestedRoom' in r);
         }
 
         if (areaFilter !== 'all') processed = processed.filter(r => getAreaId(r) === areaFilter);

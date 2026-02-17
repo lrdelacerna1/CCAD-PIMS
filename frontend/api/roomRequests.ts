@@ -1,16 +1,7 @@
-import { RoomRequestData } from '../types';
+import { RoomRequestData, RoomRequest } from '../types';
+import { createRoomRequestApi as createRoomRequestApiService } from '../../backend/api/roomRequests';
 
-export const createRoomRequestApi = async (requestData: RoomRequestData): Promise<void> => {
-    const response = await fetch('/api/room-requests', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create room request.');
-    }
+export const createRoomRequestApi = async (requestData: RoomRequestData): Promise<RoomRequest[]> => {
+    // This function now directly calls the backend service, which handles database operations.
+    return await createRoomRequestApiService(requestData);
 };

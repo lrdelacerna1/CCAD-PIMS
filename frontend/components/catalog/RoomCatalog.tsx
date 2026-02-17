@@ -13,7 +13,7 @@ interface RoomCatalogProps {
     error: string;
     onSelectInstances: (item: RoomTypeForCatalog) => void;
     onViewDetailsClick: (item: RoomTypeForCatalog) => void;
-    isRoomInCart: boolean;
+    cartedInstanceIds: Set<string>;
 }
 
 const AvailabilityBadge: React.FC<{ status: AvailabilityStatus }> = ({ status }) => {
@@ -28,7 +28,7 @@ const AvailabilityBadge: React.FC<{ status: AvailabilityStatus }> = ({ status })
     return <span className={`${baseClasses} ${statusInfo[status].classes}`}>{statusInfo[status].text}</span>;
 };
 
-const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, error, onSelectInstances, onViewDetailsClick, isRoomInCart }) => {
+const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, error, onSelectInstances, onViewDetailsClick, cartedInstanceIds }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [areaFilter, setAreaFilter] = useState('all');
 
@@ -41,6 +41,16 @@ const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, 
         if (searchQuery.trim() !== '') processed = processed.filter(rt => rt.name.toLowerCase().includes(searchQuery.toLowerCase()));
         return processed;
     }, [roomTypes, areaFilter, searchQuery]);
+
+    const isAnyInstanceOfTypeInCart = (roomType: RoomTypeForCatalog): boolean => {
+        // This is a simplification. A more robust check would involve checking instance IDs if they were available here.
+        // For now, we assume if *any* room is in the cart, we might want to prevent adding more of the same type,
+        // but the new logic allows multiple different rooms. The cart itself will manage individual instances.
+        // A better approach is to check based on what `cartedInstanceIds` tells us.
+        // This component doesn't know which instance belongs to which type, so we can't disable a type card correctly.
+        // The most user-friendly approach is to ALWAYS allow clicking "ADD TO CART" and letting the InstanceSelectionModal handle what's already selected.
+        return false; 
+    };
 
     return (
         <div>
@@ -56,7 +66,6 @@ const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, 
              (
                 <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
                     {filteredRoomTypes.length > 0 ? filteredRoomTypes.map(rt => {
-                        const isInCart = isRoomInCart;
                         const isAvailable = rt.availabilityStatus === 'Available';
                         
                         return (
@@ -75,7 +84,7 @@ const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, 
                                             <AvailabilityBadge status={rt.availabilityStatus} />
                                         </div>
                                         <div className="text-sm text-slate-600 dark:text-slate-300 mt-3">
-                                            Total available items: <span className="font-semibold">{rt.availableForDates}</span>
+                                            Total available instances: <span className="font-semibold">{rt.availableForDates}</span>
                                         </div>
                                     </div>
                                     <div className="pt-4 flex flex-row gap-2">
@@ -88,10 +97,10 @@ const RoomCatalog: React.FC<RoomCatalogProps> = ({ roomTypes, areas, isLoading, 
                                         <Button 
                                             className="!flex-1 !py-0.5 !px-3 !text-xs !bg-red-700 hover:!bg-red-800 !text-white !rounded-full !h-8"
                                             onClick={() => onSelectInstances(rt)}
-                                            disabled={isInCart || !isAvailable}
-                                            title={!isAvailable ? 'This room type is unavailable for the selected dates.' : (isInCart ? 'Already in cart' : 'Add to cart')}
+                                            disabled={!isAvailable}
+                                            title={!isAvailable ? 'This room type is unavailable for the selected dates.' : 'Select rooms to add to cart'}
                                         >
-                                            {isInCart ? 'IN CART' : 'ADD TO CART'}
+                                            ADD TO CART
                                         </Button>
                                     </div>
                                 </div>

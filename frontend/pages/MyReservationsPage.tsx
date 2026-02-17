@@ -46,11 +46,43 @@ const RequestsTable: React.FC<{
     resourceType: 'equipment' | 'room';
 }> = ({ requests, onCancel, onRowClick, areasMap, resourceType }) => {
     
-    const getItemName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems[0]?.name || 'N/A' : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
+    const getItemName = (req: AnyRequest) => {
+        if ('requestedItems' in req) {
+            return req.requestedItems[0]?.name || 'N/A';
+        } else if ('requestedRoom' in req) {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr)) {
+                 return rr.map((r: any) => r.name).join(', ') || 'N/A';
+             }
+             return (rr as any).name || 'N/A';
+        }
+        return 'N/A';
+    };
+
     const getAreaName = (req: AnyRequest) => {
-        const areaId = 'requestedItems' in req ? req.requestedItems[0]?.areaId : ('requestedRoom' in req ? req.requestedRoom.areaId : '');
+        let areaId = '';
+        if ('requestedItems' in req) {
+            areaId = req.requestedItems[0]?.areaId;
+        } else {
+             // Prioritize root level areaId if available
+             if ('areaId' in req && (req as any).areaId) {
+                 areaId = (req as any).areaId;
+             } else if ('requestedRoom' in req) {
+                 const rr = (req as any).requestedRoom;
+                 if (Array.isArray(rr) && rr.length > 0) {
+                     areaId = rr[0].areaId;
+                 } else if (!Array.isArray(rr) && rr) {
+                     areaId = rr.areaId;
+                 }
+             } else if ('roomTypeId' in req) {
+                 // Fallback to roomTypeId check in areas list if needed, but not efficient here without areas list
+                 // Assuming areaId is available or can be derived.
+                 // If we have areasMap, we need areaId. 
+             }
+        }
         return areasMap.get(areaId) || 'Unknown Area';
     };
+
     const getDateTimeString = (req: AnyRequest) => {
         const createDate = (dateStr: string) => {
             if (!dateStr) return null;
@@ -191,7 +223,17 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
     }, [userId]);
     
     const getType = (req: AnyRequest) => 'requestedItems' in req ? 'Equipment' : 'Room';
-    const getName = (req: AnyRequest) => 'requestedItems' in req ? req.requestedItems.map(i => i.name).join(', ') : ('requestedRoom' in req ? req.requestedRoom.name : 'N/A');
+    const getName = (req: AnyRequest) => {
+        if ('requestedItems' in req) {
+            return req.requestedItems.map(i => i.name).join(', ');
+        } else {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr)) {
+                 return rr.map((r: any) => r.name).join(', ');
+             }
+             return (rr as any).name || 'N/A';
+        }
+    };
 
     const filteredRequests = useMemo(() => {
         let filtered = allRequests;
@@ -346,6 +388,28 @@ const MyReservationsPage: React.FC = () => {
 
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
+    const getAreaIdForFilter = (req: AnyRequest) => {
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0].areaId;
+        if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
+        
+        if ('requestedRoom' in req) {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr) && rr.length > 0) return rr[0].areaId;
+             if (!Array.isArray(rr) && rr) return rr.areaId;
+        }
+        return '';
+    };
+    
+    const getItemNameForFilter = (req: AnyRequest) => {
+         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0].name;
+         if ('requestedRoom' in req) {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr)) return rr.map((r: any) => r.name).join(' ');
+             return (rr as any).name || '';
+         }
+         return '';
+    };
+
     const activeRequests = useMemo(() => {
         const activeEq = equipmentRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
         const activeRooms = roomRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
@@ -356,13 +420,13 @@ const MyReservationsPage: React.FC = () => {
             filtered = filtered.filter(req => req.status === statusFilter);
         }
         if (areaFilter !== 'all') {
-            filtered = filtered.filter(req => ('requestedItems' in req ? req.requestedItems.some(item => item.areaId === areaFilter) : (req as RoomRequest).requestedRoom.areaId === areaFilter));
+             filtered = filtered.filter(req => getAreaIdForFilter(req) === areaFilter);
         }
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
             filtered = filtered.filter(req => 
                 req.purpose.toLowerCase().includes(lowercasedQuery) ||
-                ('requestedItems' in req ? req.requestedItems.some(item => item.name.toLowerCase().includes(lowercasedQuery)) : (req as RoomRequest).requestedRoom.name.toLowerCase().includes(lowercasedQuery))
+                getItemNameForFilter(req).toLowerCase().includes(lowercasedQuery)
             );
         }
 

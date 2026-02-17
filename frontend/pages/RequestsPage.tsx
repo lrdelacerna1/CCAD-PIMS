@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Area, EquipmentRequest, RoomRequest, User, EquipmentRequestStatus, RoomRequestStatus } from '../types';
+import { Area, EquipmentRequest, RoomRequest, User } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { getAllEquipmentRequestsApi, updateEquipmentRequestStatusApi } from '../../backend/api/equipmentRequests';
 import { getAllRoomRequestsApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
@@ -47,9 +47,9 @@ const RequestsPage: React.FC = () => {
                 getAreasApi(),
                 getAllUsersApi(),
             ]);
-            setRequests([...equipmentData, ...roomData]);
-            setAreas(areasData);
-            setUsers(usersData);
+            setRequests([...equipmentData, ...roomData].flat());
+            setAreas(areasData || []);
+            setUsers(usersData || []);
         } catch (err) {
             setError('Failed to load request data.');
         } finally {
@@ -61,26 +61,30 @@ const RequestsPage: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const usersMap = useMemo(() => new Map(users.map(user => [user.id, user])), [users]);
-    const areasMap = useMemo(() => new Map(areas.map(area => [area.id, area.name])), [areas]);
+    const usersMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
+    const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
     
-    const getAreaId = (req: AnyRequest) => {
-        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
-        if ('roomTypeId' in req) {
-             const roomType = areas.find(area => area.id === req.roomTypeId);
-             return roomType ? roomType.id : '';
+    const getAreaId = (req: AnyRequest): string | undefined => {
+        if ('areaId' in req) {
+            return req.areaId;
         }
-        return '';
+        if ('requestedItems' in req && req.requestedItems.length > 0) {
+            return req.requestedItems[0]?.areaId;
+        }
+        return undefined;
     };
 
     const filteredAndSortedRequests = useMemo(() => {
         const managedIds = new Set(user?.managedAreaIds || []);
         const isSuperAdmin = user?.role === 'superadmin';
         
-        let processedRequests = requests.filter(r => 
-            (r.status === 'Pending Approval') &&
-            (isSuperAdmin || managedIds.has(getAreaId(r) || ''))
-        );
+        let processedRequests = requests.filter(r => {
+            const areaId = getAreaId(r);
+            // If areaId is not found, we shouldn't show it unless superadmin maybe?
+            // But if it's missing, maybe it's legacy data.
+            // Let's assume if areaId is present, we check against managedIds.
+            return r.status === 'Pending Approval' && areaId && (isSuperAdmin || managedIds.has(areaId));
+        });
 
         if (areaFilter !== 'all') {
             processedRequests = processedRequests.filter(r => getAreaId(r) === areaFilter);
@@ -91,8 +95,8 @@ const RequestsPage: React.FC = () => {
         }
     
         processedRequests.sort((a, b) => {
-            const dateA = new Date(a.requestedStartDate).getTime();
-            const dateB = new Date(b.requestedStartDate).getTime();
+            const dateA = new Date(a.dateFiled).getTime();
+            const dateB = new Date(b.dateFiled).getTime();
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
 
@@ -102,11 +106,8 @@ const RequestsPage: React.FC = () => {
     const handleSelectionChange = (id: string, isSelected: boolean) => {
         setSelectedRequestIds(prev => {
             const newSet = new Set(prev);
-            if (isSelected) {
-                newSet.add(id);
-            } else {
-                newSet.delete(id);
-            }
+            if (isSelected) newSet.add(id);
+            else newSet.delete(id);
             return newSet;
         });
     };
@@ -122,16 +123,14 @@ const RequestsPage: React.FC = () => {
     const handleAction = async (ids: string[], action: 'approve' | 'reject') => {
         if (ids.length === 0) return;
         
+        const status = action === 'approve' ? 'Approved' : 'Rejected';
+        
         try {
             const equipmentIds = ids.filter(id => requests.find(r => r.id === id && 'requestedItems' in r));
-            const roomIds = ids.filter(id => requests.find(r => r.id === id && 'roomTypeId' in r));
+            const roomIds = ids.filter(id => requests.find(r => r.id === id && 'requestedRoom' in r));
 
-            if (equipmentIds.length > 0) {
-                await updateEquipmentRequestStatusApi(equipmentIds, action === 'approve' ? 'Approved' : 'Rejected');
-            }
-            if (roomIds.length > 0) {
-                await updateRoomRequestStatusApi(roomIds, action === 'approve' ? 'Approved' : 'Rejected');
-            }
+            if (equipmentIds.length > 0) await updateEquipmentRequestStatusApi(equipmentIds, status as any);
+            if (roomIds.length > 0) await updateRoomRequestStatusApi(roomIds, status as any);
 
             setActionMessage(`Successfully ${action}d ${ids.length} request(s).`);
             setTimeout(() => setActionMessage(''), 3000);
@@ -142,83 +141,64 @@ const RequestsPage: React.FC = () => {
         }
     };
     
-    const handleViewDetails = (request: AnyRequest) => {
-        setSelectedRequest(request);
-    };
-
-    const handleCloseModal = () => {
-        setSelectedRequest(null);
-    };
+    const handleViewDetails = (request: AnyRequest) => setSelectedRequest(request);
+    const handleCloseModal = () => setSelectedRequest(null);
 
     const areaFilterOptions = useMemo(() => {
         const baseOptions = [{ value: 'all', label: 'All Areas' }];
-
-        let relevantAreas: Area[] = [];
-        if (user?.role === 'superadmin') {
-            relevantAreas = areas;
-        } else if (user?.role === 'admin' && user.managedAreaIds) {
-            const managedIds = new Set(user.managedAreaIds);
-            relevantAreas = areas.filter(a => managedIds.has(a.id));
-        }
+        const relevantAreas = user?.role === 'superadmin' 
+            ? areas 
+            : areas.filter(a => user?.managedAreaIds?.includes(a.id));
         
-        return [
-            ...baseOptions,
-            ...relevantAreas.map(a => ({ value: a.id, label: a.name }))
-        ];
+        return [...baseOptions, ...relevantAreas.map(a => ({ value: a.id, label: a.name }))];
     }, [areas, user]);
 
     return (
         <div className="container mx-auto p-6">
-            <Link to="/" target="_self" className="inline-flex items-center text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-500 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24" stroke="currentColor">
+            <Link to="/" className="inline-flex items-center text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-500 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Back to Dashboard
             </Link>
 
             <div className="flex justify-between items-center mb-1">
-                <h1 className="text-3xl font-bold dark:text-white">Requests ready for approval</h1>
-                <Link to="/all-requests" target="_self">
+                <h1 className="text-3xl font-bold dark:text-white">Requests for Approval</h1>
+                <Link to="/all-requests">
                     <Button className="!w-auto">View All Requests</Button>
                 </Link>
             </div>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Showing {filteredAndSortedRequests.length} request(s).
+                Showing {filteredAndSortedRequests.length} request(s) awaiting your action.
             </p>
 
             <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <Input 
-                            label="Search by name"
-                            id="search-requests"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="e.g., Bob Williams"
-                            icon={<SearchIcon className="w-5 h-5" />}
-                        />
-                    </div>
-                    <div>
-                        <Select
-                            label="Filter by area"
-                            id="area-filter"
-                            value={areaFilter}
-                            onChange={(e) => setAreaFilter(e.target.value)}
-                            options={areaFilterOptions}
-                        />
-                    </div>
-                        <div>
-                        <Select
-                            label="Sort by date"
-                            id="sort-order"
-                            value={sortOrder}
-                            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-                            options={[
-                                { value: 'newest', label: 'Newest First' },
-                                { value: 'oldest', label: 'Oldest First' },
-                            ]}
-                        />
-                    </div>
+                    <Input 
+                        label="Search by name"
+                        id="search-requests"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="e.g., Jane Doe"
+                        icon={<SearchIcon className="w-5 h-5" />}
+                    />
+                    <Select
+                        label="Filter by area"
+                        id="area-filter"
+                        value={areaFilter}
+                        onChange={(e) => setAreaFilter(e.target.value)}
+                        options={areaFilterOptions}
+                    />
+                    <Select
+                        label="Sort by date filed"
+                        id="sort-order"
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+                        options={[
+                            { value: 'newest', label: 'Newest First' },
+                            { value: 'oldest', label: 'Oldest First' },
+                        ]}
+                    />
                 </div>
                 <div className="flex justify-start pt-4 border-t border-gray-200 dark:border-gray-600">
                     <ToggleSwitch

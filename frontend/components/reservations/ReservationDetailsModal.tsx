@@ -72,6 +72,15 @@ const ReservationDetailsModal: React.FC<{
     const { user } = useAuth();
     const isEquipment = 'requestedItems' in reservation;
 
+    const getRoomNames = () => {
+        if (isEquipment) return '';
+        const req = reservation as RoomRequest;
+        if (Array.isArray(req.requestedRoom)) {
+            return req.requestedRoom.map((r: any) => r.name).join(', ');
+        }
+        return (req.requestedRoom as any)?.name || 'N/A';
+    };
+
     const handleFlagNoShow = async () => {
         if (isEquipment) return;
 
@@ -81,7 +90,7 @@ const ReservationDetailsModal: React.FC<{
             requestType: 'room',
             requestId: reservation.id,
             reason: 'Room No-Show',
-            details: `User did not show up for the room reservation for ${reservation.requestedRoom.name}`,
+            details: `User did not show up for the room reservation for ${getRoomNames()}`,
             amount: 25, // Example amount
             isPaid: false,
             createdAt: new Date().toISOString(),
@@ -170,7 +179,7 @@ const ReservationDetailsModal: React.FC<{
                         </p>
                         {isEquipment ? (
                             <div className="space-y-2">
-                                {Array.from(reservation.requestedItems.reduce((acc, item) => {
+                                {Array.from((reservation as EquipmentRequest).requestedItems.reduce((acc, item) => {
                                     acc.set(item.name, (acc.get(item.name) || 0) + 1);
                                     return acc;
                                 }, new Map<string, number>()).entries()).map(([name, count]) => (
@@ -182,7 +191,9 @@ const ReservationDetailsModal: React.FC<{
                             </div>
                         ) : (
                             <div className="bg-white dark:bg-slate-800 p-2 rounded border dark:border-slate-600">
-                                <span className="text-sm text-slate-800 dark:text-slate-200 font-medium">{reservation.requestedRoom.name}</span>
+                                <span className="text-sm text-slate-800 dark:text-slate-200 font-medium">
+                                    {getRoomNames()}
+                                </span>
                             </div>
                         )}
                     </div>
@@ -190,13 +201,13 @@ const ReservationDetailsModal: React.FC<{
                     {!isEquipment && (
                         <>
                             <div className="grid grid-cols-2 gap-4">
-                                <ReadOnlyField label="Start Time" value={reservation.requestedStartTime} />
-                                <ReadOnlyField label="End Time" value={reservation.requestedEndTime} />
+                                <ReadOnlyField label="Start Time" value={(reservation as RoomRequest).requestedStartTime} />
+                                <ReadOnlyField label="End Time" value={(reservation as RoomRequest).requestedEndTime} />
                             </div>
                             <div className="grid grid-cols-1">
-                                 <ReadOnlyField label="Number of Students" value={reservation.numberOfStudents} />
+                                 <ReadOnlyField label="Number of Students" value={(reservation as RoomRequest).numberOfStudents} />
                             </div>
-                            <ReadOnlyField label="Accompanying Students" value={reservation.accompanyingStudents} multiline />
+                            <ReadOnlyField label="Accompanying Students" value={(reservation as RoomRequest).accompanyingStudents} multiline />
                         </>
                     )}
 
@@ -217,8 +228,8 @@ const ReservationDetailsModal: React.FC<{
                         <>
                             <h4 className="text-md font-semibold text-slate-800 dark:text-slate-200 pt-4 border-t dark:border-slate-600">Secondary Contact</h4>
                             <div className="grid grid-cols-1 gap-4">
-                                <ReadOnlyField label="Name" value={reservation.secondaryContactName} />
-                                <ReadOnlyField label="Contact Number" value={reservation.secondaryContactNumber} />
+                                <ReadOnlyField label="Name" value={(reservation as EquipmentRequest).secondaryContactName} />
+                                <ReadOnlyField label="Contact Number" value={(reservation as EquipmentRequest).secondaryContactNumber} />
                             </div>
                         </>
                     )}

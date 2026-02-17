@@ -13,17 +13,11 @@ import {
     writeBatch
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { RoomRequest, RoomRequestStatus, RoomType } from '../../frontend/types';
+import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
 import { NotificationService } from "./notificationService";
-
-interface User {
-    id: string;
-    role: 'student' | 'admin' | 'superadmin' | 'faculty' | 'guest';
-}
 
 const roomRequestsCollection = collection(db, "roomRequests");
 const usersCollection = collection(db, "users");
-const roomTypesCollection = collection(db, "roomTypes");
 
 export const RoomRequestService = {
     
@@ -69,30 +63,19 @@ export const RoomRequestService = {
     async create(data: Omit<RoomRequest, 'id' | 'status' | 'dateFiled'>): Promise<RoomRequest> {
         const userRef = doc(db, "users", data.userId);
         const userSnap = await getDoc(userRef);
-        const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
-        
-        const roomTypeRef = doc(roomTypesCollection, data.roomTypeId);
-        const roomTypeSnap = await getDoc(roomTypeRef);
-        if (!roomTypeSnap.exists()) {
-            throw new Error("The selected room type does not exist.");
-        }
-        const roomType = roomTypeSnap.data() as RoomType;
-        const areaId = roomType.areaId;
+        const requestingUser = userSnap.exists() ? userSnap.data() : null;
 
-        let initialStatus: RoomRequestStatus;
-        if (requestingUser?.role === 'student') {
+        let initialStatus: RoomRequestStatus = 'Pending Approval';
+        if (requestingUser?.role === 'student' || (requestingUser?.role === 'guest' && data.endorserEmail)) {
             initialStatus = 'Pending Endorsement';
-        } else if (requestingUser?.role === 'guest') {
-            initialStatus = data.endorserEmail ? 'Pending Endorsement' : 'Pending Approval';
-        } else {
-            initialStatus = 'Pending Approval';
         }
 
         const newRequestData = {
             ...data,
             status: initialStatus,
             dateFiled: serverTimestamp(),
-            areaId: areaId,
+            // Ensure areaId is saved at root level for easier querying
+            areaId: data.areaId
         };
 
         const docRef = await addDoc(roomRequestsCollection, newRequestData);
@@ -128,48 +111,23 @@ export const RoomRequestService = {
         const reqSnap = await getDoc(reqRef);
         if (!reqSnap.exists()) return;
         const request = reqSnap.data() as RoomRequest;
-        const oldStatus = request.status;
 
         const updateData: any = { status };
-        
         if (status === 'Rejected' && rejectionReason) {
             updateData.rejectionReason = rejectionReason;
         }
         
         await updateDoc(reqRef, updateData);
 
-        if (status === 'Completed') {
-            await NotificationService.createNotification({
-                userId: request.userId,
-                title: "Request Completed",
-                message: `Your room request for "${request.purpose}" has been marked as completed.`,
-                isRead: false,
-                link: "/my-reservations"
-            });
-        } else {
-            await NotificationService.createNotification({
-                userId: request.userId,
-                title: "Request Status Updated",
-                message: `Your room request for "${request.purpose}" status has been updated to: ${status}.`,
-                isRead: false,
-                link: "/my-reservations"
-            });
-        }
+        await NotificationService.createNotification({
+            userId: request.userId,
+            title: "Request Status Updated",
+            message: `Your room request for "${request.purpose}" status has been updated to: ${status}.`,
+            isRead: false,
+            link: "/my-reservations"
+        });
 
-        if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval' && request.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
-            const endorserSnapshot = await getDocs(endorserQuery);
-            if (!endorserSnapshot.empty) {
-                const endorserId = endorserSnapshot.docs[0].id;
-                await NotificationService.createNotification({
-                    userId: endorserId,
-                    title: "Request Endorsed",
-                    message: `You have successfully endorsed the room request for "${request.purpose}" by ${request.userName}.`,
-                    isRead: false,
-                    link: "/my-endorsements"
-                });
-            }
-        } else if (request.endorserEmail) {
+        if (request.endorserEmail) {
             const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
@@ -203,38 +161,15 @@ export const RoomRequestService = {
         await batch.commit();
 
         for (const req of requestsToNotify) {
-            if (status === 'Completed') {
-                await NotificationService.createNotification({
-                    userId: req.userId,
-                    title: "Request Completed",
-                    message: `Your room request for "${req.purpose}" has been marked as completed.`,
-                    isRead: false,
-                    link: "/my-reservations"
-                });
-            } else {
-                await NotificationService.createNotification({
-                    userId: req.userId,
-                    title: "Request Status Updated",
-                    message: `Your room request for "${req.purpose}" status has been updated to: ${status}.`,
-                    isRead: false,
-                    link: "/my-reservations"
-                });
-            }
+            await NotificationService.createNotification({
+                userId: req.userId,
+                title: "Request Status Updated",
+                message: `Your room request for "${req.purpose}" status has been updated to: ${status}.`,
+                isRead: false,
+                link: "/my-reservations"
+            });
 
-            if (req.status === 'Pending Endorsement' && status === 'Pending Approval' && req.endorserEmail) {
-                const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
-                const endorserSnapshot = await getDocs(endorserQuery);
-                if (!endorserSnapshot.empty) {
-                    const endorserId = endorserSnapshot.docs[0].id;
-                    await NotificationService.createNotification({
-                        userId: endorserId,
-                        title: "Request Endorsed",
-                        message: `You have successfully endorsed the room request for "${req.purpose}" by ${req.userName}.`,
-                        isRead: false,
-                        link: "/my-endorsements"
-                    });
-                }
-            } else if (req.endorserEmail) {
+            if (req.endorserEmail) {
                 const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
                 if (!endorserSnapshot.empty) {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Area, InventoryItem, InventoryItemForCatalog, InventoryInstance, User } from '../../types';
+import { Area, InventoryItemForCatalog, InventoryInstance } from '../../types';
 import { createEquipmentRequestApi } from '../../../backend/api/equipmentRequests';
-import { getInventoryCatalogApi, checkAvailabilityApi, getInventoryApi } from '../../../backend/api/inventory';
+import { getInventoryCatalogApi, checkAvailabilityApi } from '../../../backend/api/inventory';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
@@ -20,7 +20,7 @@ interface NewEquipmentRequestModalProps {
     areas: Area[];
     onClose: () => void;
     onSuccess: () => void;
-    items: Map<string, EquipmentCartInstanceEntry>; // Key is instance ID
+    items: Map<string, EquipmentCartInstanceEntry>; 
     startDate: string;
     endDate: string;
     minimumLeadDays: number;
@@ -63,7 +63,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
     })();
 
     useEffect(() => {
-        if (items.size > 0) return; // Don't fetch if items are pre-filled
+        if (items.size > 0) return;
 
         const handler = setTimeout(() => {
             const fetchAvailableInstances = async () => {
@@ -288,7 +288,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                         value={areaFilter}
                                         onChange={e => {
                                             setAreaFilter(e.target.value);
-                                            setSelectedInstanceId(''); // Reset selection
+                                            setSelectedInstanceId('');
                                         }}
                                         options={areaOptions}
                                     />

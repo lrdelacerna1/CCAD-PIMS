@@ -34,8 +34,14 @@ const RequestManagementTable: React.FC<RequestManagementTableProps> = ({
     const areAllSelected = requests.length > 0 && selectedIds.size === requests.length;
 
     const getAreaId = (req: AnyRequest) => {
-        if ('requestedItems' in req) return req.requestedItems[0]?.areaId;
-        if ('requestedRoom' in req) return req.requestedRoom.areaId;
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId;
+        if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
+        
+        if ('requestedRoom' in req) {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr) && rr.length > 0) return rr[0].areaId;
+             if (!Array.isArray(rr) && rr) return rr.areaId;
+        }
         return '';
     };
 
