@@ -26,7 +26,7 @@ const usersCollection = collection(db, "users");
 const inventoryCollection = collection(db, "inventory");
 
 export const EquipmentRequestService = {
-    
+
     async getAll(): Promise<EquipmentRequest[]> {
         const q = query(equipmentRequestsCollection, orderBy("dateFiled", "desc"));
         const querySnapshot = await getDocs(q);
@@ -52,7 +52,7 @@ export const EquipmentRequestService = {
             } as EquipmentRequest;
         });
     },
-    
+
     async getByEndorserEmail(endorserEmail: string): Promise<EquipmentRequest[]> {
         const q = query(equipmentRequestsCollection, where("endorserEmail", "==", endorserEmail), orderBy("dateFiled", "desc"));
         const querySnapshot = await getDocs(q);
@@ -71,17 +71,14 @@ export const EquipmentRequestService = {
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
 
-        let areaId = '';
-        if (data.requestedItems.length > 0) {
-            const firstItem = await getDoc(doc(inventoryCollection, data.requestedItems[0].itemId));
-            if (firstItem.exists()) {
-                areaId = (firstItem.data() as InventoryItem).areaId;
-            }
+        const areaId = (data.requestedItems[0] as any)?.areaId || '';
+        if (!areaId) {
+            throw new Error("Could not determine area for this request.");
         }
 
         const userRole = requestingUser?.role;
         const needsEndorsement = (userRole === 'student') || (userRole === 'guest' && !!data.endorserEmail);
-        const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Confirmation';
+        const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
 
         const newRequestData = {
             ...data,
@@ -118,21 +115,21 @@ export const EquipmentRequestService = {
 
     async updateStatus(id: string, status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
         const reqRef = doc(db, "equipmentRequests", id);
-        
+
         const reqSnap = await getDoc(reqRef);
         if (!reqSnap.exists()) return;
         const request = reqSnap.data() as EquipmentRequest;
         const oldStatus = request.status;
 
         const updateData: any = { status };
-        
+
         if (status === 'Rejected' && rejectionReason) {
             updateData.rejectionReason = rejectionReason;
         }
-        
+
         await updateDoc(reqRef, updateData);
 
-        if (status === 'Completed') {
+        if (status === 'Returned') {
             await NotificationService.createNotification({
                 userId: request.userId,
                 title: "Request Completed",
@@ -178,7 +175,7 @@ export const EquipmentRequestService = {
             }
         }
     },
-    
+
     async updateStatusBatch(ids: string[], status: EquipmentRequestStatus, rejectionReason?: string): Promise<void> {
         const batch = writeBatch(db);
         const requestsToNotify: EquipmentRequest[] = [];
@@ -186,7 +183,7 @@ export const EquipmentRequestService = {
         for (const id of ids) {
             const ref = doc(db, "equipmentRequests", id);
             const reqSnap = await getDoc(ref);
-            
+
             if (reqSnap.exists()) {
                 requestsToNotify.push(reqSnap.data() as EquipmentRequest);
                 const data: any = { status };
@@ -194,11 +191,11 @@ export const EquipmentRequestService = {
                 batch.update(ref, data);
             }
         }
-        
+
         await batch.commit();
 
         for (const req of requestsToNotify) {
-             if (status === 'Completed') {
+            if (status === 'Returned')  {
                 await NotificationService.createNotification({
                     userId: req.userId,
                     title: "Request Completed",

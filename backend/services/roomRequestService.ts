@@ -70,39 +70,35 @@ export const RoomRequestService = {
         const userRef = doc(db, "users", data.userId);
         const userSnap = await getDoc(userRef);
         const requestingUser = userSnap.exists() ? (userSnap.data() as User) : null;
-        
-        // AFTER
-const firstRoom = (data as any).requestedRoom?.[0];
-if (!firstRoom?.roomTypeId) {
-    throw new Error("No room type specified in the request.");
-}
-
-        const roomTypeRef = doc(roomTypesCollection, firstRoom.roomTypeId);
-        const roomTypeSnap = await getDoc(roomTypeRef);
-        if (!roomTypeSnap.exists()) {
-            throw new Error("The selected room type does not exist.");
+    
+        const requestedRooms = (data as any).requestedRoom as { roomTypeId: string; areaId: string; instanceId: string; name: string }[];
+        if (!requestedRooms || requestedRooms.length === 0) {
+            throw new Error("No rooms specified in the request.");
         }
-        const roomType = roomTypeSnap.data() as RoomType;
-        const areaId = firstRoom.areaId || roomType.areaId;
-
+    
+        // Derive areaId directly from the first room's areaId (already set by the modal)
+        const areaId = requestedRooms[0].areaId;
+        if (!areaId) {
+            throw new Error("Could not determine area for this request.");
+        }
+    
         const userRole = requestingUser?.role;
-        const needsEndorsement = (userRole === 'student') || (userRole === 'guest' && !!data.endorserEmail);
-        const initialStatus: RoomRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Confirmation';
-
+        const needsEndorsement = (userRole === 'student') || (userRole === 'guest' && !!(data as any).endorserEmail);
+        const initialStatus: RoomRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Approval';
+    
         const newRequestData = {
             ...data,
             status: initialStatus,
             dateFiled: serverTimestamp(),
             areaId: areaId,
         };
-
+    
         const docRef = await addDoc(roomRequestsCollection, newRequestData);
-        
         const newDocSnap = await getDoc(docRef);
         const createdData = newDocSnap.data();
-
-        if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
+    
+        if (initialStatus === 'Pending Endorsement' && (data as any).endorserEmail) {
+            const endorserQuery = query(usersCollection, where("email", "==", (data as any).endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
                 const endorserId = endorserSnapshot.docs[0].id;
@@ -115,7 +111,7 @@ if (!firstRoom?.roomTypeId) {
                 });
             }
         }
-
+    
         return {
             id: docRef.id,
             ...createdData,
