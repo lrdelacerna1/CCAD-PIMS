@@ -236,10 +236,13 @@ const MyEndorsementsPage: React.FC = () => {
         });
     };
 
+    // AFTER
+    const ENDORSED_STATUSES = ['Pending Approval', 'Approved', 'Ready for Pickup', 'Ready for Check-in', 'In Use', 'Returned', 'Completed', 'Overdue'];
+
     const categorizedEq = useMemo(() => {
         return {
             pending: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Pending Endorsement')),
-            endorsed: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Pending Approval')),
+            endorsed: filterAndSortRequests(equipmentRequests.filter(r => ENDORSED_STATUSES.includes(r.status))),
             rejected: filterAndSortRequests(equipmentRequests.filter(r => r.status === 'Rejected')),
         };
     }, [equipmentRequests, searchQuery, areaFilter, sortOrder]);
@@ -247,7 +250,7 @@ const MyEndorsementsPage: React.FC = () => {
     const categorizedRooms = useMemo(() => {
         return {
             pending: filterAndSortRequests(roomRequests.filter(r => r.status === 'Pending Endorsement')),
-            endorsed: filterAndSortRequests(roomRequests.filter(r => r.status === 'Pending Approval')),
+            endorsed: filterAndSortRequests(roomRequests.filter(r => ENDORSED_STATUSES.includes(r.status))),
             rejected: filterAndSortRequests(roomRequests.filter(r => r.status === 'Rejected')),
         };
     }, [roomRequests, searchQuery, areaFilter, sortOrder]);
@@ -257,14 +260,24 @@ const MyEndorsementsPage: React.FC = () => {
         setIsProcessing(true);
         try {
             const newStatus = actionType === 'endorse' ? 'Pending Approval' : 'Rejected';
+
             if ('requestedItems' in requestToAction) {
                 await updateEquipmentRequestStatusApi([requestToAction.id], newStatus as EquipmentRequestStatus);
+                // Optimistically update local state immediately
+                setEquipmentRequests(prev =>
+                    prev.map(r => r.id === requestToAction.id ? { ...r, status: newStatus as EquipmentRequestStatus } : r)
+                );
             } else {
                 await updateRoomRequestStatusApi([requestToAction.id], newStatus as RoomRequestStatus);
+                // Optimistically update local state immediately
+                setRoomRequests(prev =>
+                    prev.map(r => r.id === requestToAction.id ? { ...r, status: newStatus as RoomRequestStatus } : r)
+                );
             }
+
             setRequestToAction(null);
             setActionType(null);
-            fetchData();
+            fetchData(); // still refetches in background to sync
         } catch (err) {
             setError(`Failed to ${actionType} the request.`);
         } finally {
@@ -350,15 +363,15 @@ const MyEndorsementsPage: React.FC = () => {
                     {mainTab === 'equipment' && (
                         <div className="space-y-4">
                             {nestedTab === 'pending' && (categorizedEq.pending.length > 0 ? <RequestsTable requests={categorizedEq.pending} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('pending', 'equipment', equipmentRequests.length > 0))}
-                            {nestedTab === 'endorsed' && (categorizedEq.endorsed.length > 0 ? <RequestsTable requests={categorizedEq.endorsed} onEndorse={() => {}} onReject={() => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('endorsed', 'equipment', equipmentRequests.length > 0))}
-                            {nestedTab === 'rejected' && (categorizedEq.rejected.length > 0 ? <RequestsTable requests={categorizedEq.rejected} onEndorse={() => {}} onReject={() => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('rejected', 'equipment', equipmentRequests.length > 0))}
+                            {nestedTab === 'endorsed' && (categorizedEq.endorsed.length > 0 ? <RequestsTable requests={categorizedEq.endorsed} onEndorse={() => { }} onReject={() => { }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('endorsed', 'equipment', equipmentRequests.length > 0))}
+                            {nestedTab === 'rejected' && (categorizedEq.rejected.length > 0 ? <RequestsTable requests={categorizedEq.rejected} onEndorse={() => { }} onReject={() => { }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" /> : renderEmptyState('rejected', 'equipment', equipmentRequests.length > 0))}
                         </div>
                     )}
                     {mainTab === 'rooms' && (
                         <div className="space-y-4">
                             {nestedTab === 'pending' && (categorizedRooms.pending.length > 0 ? <RequestsTable requests={categorizedRooms.pending} onEndorse={(req) => { setRequestToAction(req); setActionType('endorse'); }} onReject={(req) => { setRequestToAction(req); setActionType('reject'); }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('pending', 'room', roomRequests.length > 0))}
-                            {nestedTab === 'endorsed' && (categorizedRooms.endorsed.length > 0 ? <RequestsTable requests={categorizedRooms.endorsed} onEndorse={() => {}} onReject={() => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('endorsed', 'room', roomRequests.length > 0))}
-                            {nestedTab === 'rejected' && (categorizedRooms.rejected.length > 0 ? <RequestsTable requests={categorizedRooms.rejected} onEndorse={() => {}} onReject={() => {}} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('rejected', 'room', roomRequests.length > 0))}
+                            {nestedTab === 'endorsed' && (categorizedRooms.endorsed.length > 0 ? <RequestsTable requests={categorizedRooms.endorsed} onEndorse={() => { }} onReject={() => { }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('endorsed', 'room', roomRequests.length > 0))}
+                            {nestedTab === 'rejected' && (categorizedRooms.rejected.length > 0 ? <RequestsTable requests={categorizedRooms.rejected} onEndorse={() => { }} onReject={() => { }} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" /> : renderEmptyState('rejected', 'room', roomRequests.length > 0))}
                         </div>
                     )}
                 </div>
