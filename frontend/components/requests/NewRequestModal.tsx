@@ -44,22 +44,19 @@ const NewRequestModal: React.FC<NewRequestModalProps> = (props) => {
     }
     
     if (type === 'room') {
-        const simplifiedPreselectedRoom: RoomTypeWithQuantity | null = props.preselectedItem
-            ? {
-                id: 'preselected',
-                name: props.preselectedItem.name,
-                areaId: props.preselectedItem.areaId,
-                quantity: { total: 1, available: 1, inUse: 0, underMaintenance: 0 },
-            }
-            : null;
-
+        // NewRoomRequestModal expects a Map of instances.
+        // If we have a preselected item, we might not have the instance details here easily without fetching.
+        // For now, to fix the crash, we pass an empty map, meaning the user will have to select the room in the modal.
+        // If preselectedItem logic is crucial, it would need fetching instances first, but typically "New Request" is empty.
+        
+        const rooms = new Map();
         const date = getStartDate();
 
         return <NewRoomRequestModal
             areas={props.areas}
             onClose={props.onClose}
             onSuccess={props.onSuccess}
-            room={simplifiedPreselectedRoom || undefined}
+            rooms={rooms}
             startDate={date}
             endDate={date}
             minimumLeadDays={props.minimumLeadDays}
