@@ -160,7 +160,9 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
         try {
             const requestedRoomsPayload = Array.from(requestRooms.values()).map(({ type, instance }) => ({
                 roomTypeId: type.id,
-                name: type.name,
+                // FIX: Combine type name and instance name for clarity: "Conference Room (Room 101)"
+                // This aligns with user request for "Room Type and specific instance asset tag (or name in case of room)"
+                name: `${type.name} (${instance.name})`,
                 areaId: type.areaId,
                 instanceId: instance.id,
             }));
@@ -215,7 +217,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
         .filter(({ instance }) => !requestRooms.has(instance.id))
         .map(({ instance, type }) => ({
             value: instance.id,
-            label: `${instance.name} (${type.name})`
+            label: `${type.name} (${instance.name})`
         }));
     
     const cartEntries = Array.from(requestRooms.values());
@@ -279,7 +281,7 @@ const NewRoomRequestModal: React.FC<NewRoomRequestModalProps> = ({ areas, onClos
                                 <div className="mt-2 space-y-2">
                                     {cartEntries.map(({ type, instance }) => (
                                         <div key={instance.id} className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded">
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">{instance.name} ({type.name})</span>
+                                            <span className="text-sm text-slate-600 dark:text-slate-300">{type.name} ({instance.name})</span>
                                             <button type="button" onClick={() => handleRemoveRoom(instance.id)} className="text-slate-400 hover:text-rose-500" title="Remove room">
                                                 <XIcon className="w-5 h-5"/>
                                             </button>

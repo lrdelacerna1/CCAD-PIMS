@@ -37,7 +37,7 @@ interface AvailabilityRequest {
 interface InstanceAvailabilityResult {
     itemId: string;
     itemName: string;
-    availableInstances: { id: string, assetTag: string, condition: InventoryInstanceCondition }[];
+    availableInstances: InventoryInstance[]; // Return full instance objects
     unavailableInstances: { id: string, assetTag: string, status: InventoryInstanceStatus }[];
 }
 
@@ -95,8 +95,11 @@ export const InventoryService = {
             return acc;
         }, {} as Record<string, any[]>);
 
+        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
+        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'];
+        
         const reservationsSnapshot = await getDocs(query(equipmentRequestsCollection,
-            where('status', 'in', ['Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'])
+            where('status', 'in', blockingStatuses)
         ));
         
         const overlappingReservations = reservationsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -218,8 +221,11 @@ export const InventoryService = {
         const { startDate, endDate, itemIds } = request;
         const results: InstanceAvailabilityResult[] = [];
 
+        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
+        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'];
+
         const reservationsSnapshot = await getDocs(query(equipmentRequestsCollection,
-            where('status', 'in', ['Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'])
+            where('status', 'in', blockingStatuses)
         ));
         const overlappingReservations = reservationsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
             .filter((res: any) => {
@@ -255,7 +261,7 @@ export const InventoryService = {
             const instancesSnapshot = await getDocs(query(inventoryInstancesCollection, where("itemId", "==", itemId)));
             const allInstancesOfItem = instancesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as InventoryInstance[];
 
-            const availableInstancesResult: { id: string, assetTag: string, condition: InventoryInstanceCondition }[] = [];
+            const availableInstancesResult: InventoryInstance[] = [];
             const unavailableInstancesResult: { id: string, assetTag: string, status: InventoryInstanceStatus }[] = [];
             
             for (const inst of allInstancesOfItem) {
@@ -268,7 +274,8 @@ export const InventoryService = {
                 } else if (reservedInstanceIds.has(inst.id)) {
                     unavailableInstancesResult.push({ id: inst.id, assetTag: inst.assetTag, status: 'Reserved' });
                 } else {
-                    availableInstancesResult.push({ id: inst.id, assetTag: inst.assetTag, condition: inst.condition });
+                    // FIX: Push full instance object to allow frontend to access 'name' if available
+                    availableInstancesResult.push(inst);
                 }
             }
 

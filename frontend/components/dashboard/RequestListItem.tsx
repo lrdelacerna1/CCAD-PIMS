@@ -13,8 +13,8 @@ interface RequestListItemProps {
 
 const RequestListItem: React.FC<RequestListItemProps> = ({ reservation, areaName, onClick }) => {
     // FIX: Determine start time based on request type.
-    const startTime = 'requestedStartTime' in reservation ? reservation.requestedStartTime : 'All Day';
-    const endTime = 'requestedEndTime' in reservation ? reservation.requestedEndTime : '';
+    const startTime = (reservation as any).requestedStartTime || 'All Day';
+    const endTime = (reservation as any).requestedEndTime || '';
     
     return (
         <div

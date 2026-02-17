@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Checkbox } from '../ui/Checkbox';
 import { ShoppingCartIcon, ChevronDoubleLeftIcon, XIcon } from '../Icons';
 
 type EquipmentCartData = Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>;
@@ -20,6 +21,14 @@ interface CartProps {
     endDate: string;
     onStartDateChange: (date: string) => void;
     onEndDateChange: (date: string) => void;
+    // New props for time and whole day selection
+    startTime?: string;
+    endTime?: string;
+    onStartTimeChange?: (time: string) => void;
+    onEndTimeChange?: (time: string) => void;
+    isWholeDay?: boolean;
+    onWholeDayChange?: (isWhole: boolean) => void;
+    
     minDate: string;
     isCollapsed: boolean;
     onToggleCollapse?: () => void;
@@ -28,8 +37,9 @@ interface CartProps {
 
 export const Cart: React.FC<CartProps> = ({
     items, availability, isLoading, isSubmittable, onRemove, onFinalize, type,
-    startDate, endDate, onStartDateChange, onEndDateChange, minDate,
-    isCollapsed, onToggleCollapse, onClose
+    startDate, endDate, onStartDateChange, onEndDateChange, 
+    startTime = '08:00', endTime = '17:00', onStartTimeChange, onEndTimeChange, isWholeDay = false, onWholeDayChange,
+    minDate, isCollapsed, onToggleCollapse, onClose
 }) => {
     
     const isEquipment = type === 'equipment' && items instanceof Map;
@@ -87,6 +97,31 @@ export const Cart: React.FC<CartProps> = ({
                 </div>
                 <div>
                     <Input label="End Date" id="sidebar-end-date" type="date" value={endDate} onChange={e => onEndDateChange(e.target.value)} min={startDate} />
+                </div>
+                
+                {/* Time Selection */}
+                <div className="pt-2 border-t dark:border-slate-700">
+                    <p className="block text-sm font-medium text-slate-900 dark:text-white mb-2">Time Range</p>
+                    {onWholeDayChange && (
+                        <div className="mb-2">
+                            <Checkbox 
+                                id="whole-day-toggle" 
+                                checked={isWholeDay} 
+                                onChange={e => onWholeDayChange(e.target.checked)}
+                                label="Whole Day" 
+                            />
+                        </div>
+                    )}
+                    {!isWholeDay && onStartTimeChange && onEndTimeChange && (
+                        <>
+                            <div className="mb-2">
+                                <Input label="Start Time" id="sidebar-start-time" type="time" value={startTime} onChange={e => onStartTimeChange(e.target.value)} />
+                            </div>
+                            <div>
+                                <Input label="End Time" id="sidebar-end-time" type="time" value={endTime} onChange={e => onEndTimeChange(e.target.value)} />
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 

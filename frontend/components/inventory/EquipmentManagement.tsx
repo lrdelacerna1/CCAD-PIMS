@@ -382,6 +382,7 @@ const InstanceDetailsModal: React.FC<{ instance: InventoryInstance; item: Invent
                 <div className="p-6">
                     <div className="flex justify-between items-center border-b pb-3 mb-4 dark:border-slate-600">
                         <div>
+                            {/* FIX: Show Asset Tag instead of Serial Number in header if available */}
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">{instance.assetTag}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{item.name}</p>
                         </div>

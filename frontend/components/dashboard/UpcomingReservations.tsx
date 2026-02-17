@@ -25,7 +25,8 @@ const UpcomingReservations: React.FC<UpcomingReservationsProps> = ({ reservation
 
         reservations.forEach(res => {
             // FIX: Correctly parse the reservation date string as UTC midnight to prevent timezone bugs.
-            const resDate = new Date(res.requestedStartDate + 'T00:00:00Z');
+            const dateParts = res.requestedStartDate.split('T');
+            const resDate = new Date(dateParts[0] + 'T00:00:00Z');
             
             let dateString;
             if (resDate.getTime() === today.getTime()) {
@@ -69,9 +70,15 @@ const UpcomingReservations: React.FC<UpcomingReservationsProps> = ({ reservation
     }
 
     const getAreaId = (req: AnyRequest) => {
-      if ('requestedItems' in req) return req.requestedItems[0]?.areaId || '';
-      if ('requestedRoom' in req) return req.requestedRoom.areaId;
-      return '';
+        if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0]?.areaId || '';
+        if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
+        
+        if ('requestedRoom' in req) {
+             const rr = (req as any).requestedRoom;
+             if (Array.isArray(rr) && rr.length > 0) return rr[0].areaId;
+             if (!Array.isArray(rr) && rr) return rr.areaId;
+        }
+        return '';
     };
 
     return (

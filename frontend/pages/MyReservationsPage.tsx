@@ -48,7 +48,8 @@ const RequestsTable: React.FC<{
     
     const getItemName = (req: AnyRequest) => {
         if ('requestedItems' in req) {
-            return req.requestedItems[0]?.name || 'N/A';
+            // FIX: Join names of all requested items to show all reserved instances
+            return req.requestedItems.map(i => i.name).join(', ') || 'N/A';
         } else if ('requestedRoom' in req) {
              const rr = (req as any).requestedRoom;
              if (Array.isArray(rr)) {
@@ -75,9 +76,7 @@ const RequestsTable: React.FC<{
                      areaId = rr.areaId;
                  }
              } else if ('roomTypeId' in req) {
-                 // Fallback to roomTypeId check in areas list if needed, but not efficient here without areas list
-                 // Assuming areaId is available or can be derived.
-                 // If we have areasMap, we need areaId. 
+                 // Fallback to roomTypeId check in areas list if needed
              }
         }
         return areasMap.get(areaId) || 'Unknown Area';
@@ -104,7 +103,17 @@ const RequestsTable: React.FC<{
             const endDate = createDate(req.requestedEndDate);
             if (!endDate) return start;
             const end = format(endDate, 'MMM d, yyyy');
-            return start === end ? start : `${start} to ${end}`;
+            
+            const startTime = (req as any).requestedStartTime;
+            const endTime = (req as any).requestedEndTime;
+            
+            const datePart = start === end ? start : `${start} to ${end}`;
+            
+            if (startTime && endTime) {
+                 return `${datePart} at ${startTime} - ${endTime}`;
+            }
+            
+            return datePart;
         } else {
             return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
         }
@@ -401,7 +410,7 @@ const MyReservationsPage: React.FC = () => {
     };
     
     const getItemNameForFilter = (req: AnyRequest) => {
-         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0].name;
+         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems.map(i => i.name).join(' ');
          if ('requestedRoom' in req) {
              const rr = (req as any).requestedRoom;
              if (Array.isArray(rr)) return rr.map((r: any) => r.name).join(' ');

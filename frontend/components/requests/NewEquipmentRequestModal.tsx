@@ -187,9 +187,12 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         try {
             const requestedItemsPayload = Array.from(requestItems.values()).map(({ item, instance }) => ({
                 itemId: item.id,
-                name: item.name,
+                // FIX: User explicitly confirmed "BY NAME, I MEANT ASSET TAG".
+                // So we use asset tag as the primary identifier.
+                name: instance.assetTag ? `${item.name} (${instance.assetTag})` : item.name,
                 areaId: item.areaId,
                 instanceId: instance.id,
+                quantity: 1, // Explicitly set quantity to 1 for instance-based requests
             }));
 
             const requestData: any = {
@@ -199,6 +202,10 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                 purpose,
                 requestedStartDate: `${currentStartDate}T${requestedStartTime}`,
                 requestedEndDate: `${currentEndDate}T${requestedEndTime}`,
+                // Ensure time is also saved separately if needed or just use ISO string above
+                // For equipment, time slots might be important now
+                requestedStartTime,
+                requestedEndTime,
                 secondaryContactName,
                 secondaryContactNumber,
                 requestedItems: requestedItemsPayload,
@@ -227,7 +234,7 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
         .filter(({ instance }) => !requestItems.has(instance.id))
         .map(({ instance, item }) => ({
             value: instance.id,
-            label: `${item.name} (Asset Tag: ${instance.assetTag})`
+            label: instance.assetTag ? `${item.name} (${instance.assetTag})` : item.name
         }));
         
     const cartEntries = Array.from(requestItems.values());
@@ -317,7 +324,10 @@ const NewEquipmentRequestModal: React.FC<NewEquipmentRequestModalProps> = ({ are
                                 <div className="mt-2 space-y-2">
                                     {cartEntries.map(({ item, instance }) => (
                                         <div key={instance.id} className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded">
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">{item.name} (Asset Tag: {instance.assetTag})</span>
+                                            <span className="text-sm text-slate-600 dark:text-slate-300">
+                                                {/* Use item name + asset tag as confirmed by user */}
+                                                {item.name} {instance.assetTag ? `(${instance.assetTag})` : ''}
+                                            </span>
                                             <button type="button" onClick={() => handleRemoveItem(instance.id)} className="text-slate-400 hover:text-rose-500" title="Remove item">
                                                 <XIcon className="w-5 h-5"/>
                                             </button>

@@ -108,6 +108,10 @@ const ReservationDetailsModal: React.FC<{
 
     const startDateStr = formatDate(reservation.requestedStartDate, 'yyyy-MM-dd');
     const endDateStr = formatDate(reservation.requestedEndDate, 'yyyy-MM-dd');
+    
+    // FIX: Show time for both equipment and rooms. Use requestedStartTime if available, otherwise try to format from date.
+    const startTimeStr = (reservation as any).requestedStartTime || formatDate(reservation.requestedStartDate, 'h:mm a');
+    const endTimeStr = (reservation as any).requestedEndTime || formatDate(reservation.requestedEndDate, 'h:mm a');
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -172,6 +176,11 @@ const ReservationDetailsModal: React.FC<{
                         <ReadOnlyField label="Start Date" value={startDateStr} />
                         <ReadOnlyField label="End Date" value={endDateStr} />
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <ReadOnlyField label="Start Time" value={startTimeStr} />
+                        <ReadOnlyField label="End Time" value={endTimeStr} />
+                    </div>
 
                     <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
                         <p className="font-semibold text-slate-800 dark:text-slate-200 mb-2">
@@ -180,6 +189,7 @@ const ReservationDetailsModal: React.FC<{
                         {isEquipment ? (
                             <div className="space-y-2">
                                 {Array.from((reservation as EquipmentRequest).requestedItems.reduce((acc, item) => {
+                                    // Use the specific item name (which now includes asset tag) as key
                                     acc.set(item.name, (acc.get(item.name) || 0) + 1);
                                     return acc;
                                 }, new Map<string, number>()).entries()).map(([name, count]) => (
@@ -200,10 +210,6 @@ const ReservationDetailsModal: React.FC<{
 
                     {!isEquipment && (
                         <>
-                            <div className="grid grid-cols-2 gap-4">
-                                <ReadOnlyField label="Start Time" value={(reservation as RoomRequest).requestedStartTime} />
-                                <ReadOnlyField label="End Time" value={(reservation as RoomRequest).requestedEndTime} />
-                            </div>
                             <div className="grid grid-cols-1">
                                  <ReadOnlyField label="Number of Students" value={(reservation as RoomRequest).numberOfStudents} />
                             </div>

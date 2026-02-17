@@ -86,9 +86,12 @@ export const RoomService = {
         const allInstancesSnapshot = await getDocs(query(roomInstancesCollection));
         const allInstances = allInstancesSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
         
+        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
+        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue'];
+
         const allReservationsSnapshot = await getDocs(query(
             roomRequestsCollection,
-            where('status', 'in', ['Pending Confirmation','For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue']),
+            where('status', 'in', blockingStatuses),
         ));
         
         const allReservations = allReservationsSnapshot.docs.map(d => ({id: d.id, ...d.data()}))
@@ -225,9 +228,12 @@ export const RoomService = {
         const { startDate, endDate, roomTypeIds } = request;
         const results: RoomInstanceAvailabilityResult[] = [];
 
+        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
+        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue'];
+
         const reservationsSnapshot = await getDocs(query(
             roomRequestsCollection,
-            where('status', 'in', ['Pending Confirmation', 'For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue'])
+            where('status', 'in', blockingStatuses)
         ));
         const allReservations = reservationsSnapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))

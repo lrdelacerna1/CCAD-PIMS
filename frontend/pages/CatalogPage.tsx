@@ -35,6 +35,11 @@ const CatalogPage: React.FC = () => {
 
     const [startDate, setStartDate] = useState(minDate);
     const [endDate, setEndDate] = useState(minDate);
+    
+    // Time states
+    const [startTime, setStartTime] = useState('08:00');
+    const [endTime, setEndTime] = useState('17:00');
+    const [isWholeDay, setIsWholeDay] = useState(false);
 
     const [equipmentCart, setEquipmentCart] = useState<Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>>(new Map());
     const [roomCart, setRoomCart] = useState<Map<string, { type: RoomTypeForCatalog, instance: RoomInstance }>>(new Map());
@@ -79,6 +84,8 @@ const CatalogPage: React.FC = () => {
         setIsLoading(true);
         setError('');
         try {
+            // NOTE: Ideally, the catalog API should accept time parameters to filter availability more precisely.
+            // Currently, it filters by date range only.
             if (activeTab === 'equipment') {
                 const inventoryData = await getInventoryCatalogApi(startDate, endDate);
                 setEquipmentInventory(inventoryData || []);
@@ -94,7 +101,7 @@ const CatalogPage: React.FC = () => {
     };
 
     fetchCatalogData();
-}, [startDate, endDate, activeTab]);
+}, [startDate, endDate, activeTab, startTime, endTime, isWholeDay]); // Re-fetch when time changes (even if backend doesn't fully support it yet, it prepares for it)
 
     useEffect(() => {
         setEquipmentCart(new Map());
@@ -197,6 +204,14 @@ const CatalogPage: React.FC = () => {
                     endDate={endDate}
                     onStartDateChange={setStartDate}
                     onEndDateChange={setEndDate}
+                    // Pass time props
+                    startTime={startTime}
+                    endTime={endTime}
+                    onStartTimeChange={setStartTime}
+                    onEndTimeChange={setEndTime}
+                    isWholeDay={isWholeDay}
+                    onWholeDayChange={setIsWholeDay}
+                    
                     minDate={minDate}
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -301,6 +316,9 @@ const CatalogPage: React.FC = () => {
                         startDate={startDate}
                         endDate={endDate}
                         minimumLeadDays={settings?.minimumLeadDays ?? 2}
+                        // Pass selected time to modal if supported
+                        // Note: NewEquipmentRequestModal currently has local state for time, 
+                        // ideally we should pass it as initial props if we want it pre-filled
                     />
                 ) : (
                     roomCart.size > 0 && (

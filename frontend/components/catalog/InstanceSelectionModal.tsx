@@ -84,7 +84,10 @@ const InstanceSelectionModal: React.FC<InstanceSelectionModalProps> = ({ item, s
         const isGenerallyAvailable = instance.status === 'Available';
         const isAvailableForDates = availableInstanceIds.has(instance.id);
         const isAlreadyInCart = alreadySelectedIds.has(instance.id);
-        const name = 'serialNumber' in instance ? instance.serialNumber : instance.name;
+        const name = isEquipment 
+            ? ((instance as any).name || (instance as InventoryInstance).assetTag)
+            : instance.name;
+        
         const isDisabled = !isGenerallyAvailable || !isAvailableForDates || (isAlreadyInCart && !isSelected);
         
         let statusText = '';

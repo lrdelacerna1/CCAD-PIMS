@@ -76,7 +76,8 @@ const InstanceCalendar: React.FC<{
     instance: InventoryInstance | RoomInstance;
 }> = ({ instance }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+    // FIX: Store booked times for each date to show in tooltip
+    const [bookedDates, setBookedDates] = useState<Map<string, string[]>>(new Map());
     const [isCalendarLoading, setIsCalendarLoading] = useState(true);
 
     const isEquipment = 'serialNumber' in instance;
@@ -86,33 +87,45 @@ const InstanceCalendar: React.FC<{
             if (!instance.id) return;
             setIsCalendarLoading(true);
             try {
-                const booked = new Set<string>();
+                const booked = new Map<string, string[]>();
                 if (isEquipment) {
                     const allRequests: EquipmentRequest[] = await getAllEquipmentRequestsApi();
                     const instanceRequests = allRequests.filter(req => 
                         req.requestedItems.some(item => item.instanceId === instance.id) &&
-                        ['Ready for Pickup'].includes(req.status)
+                        ['Approved', 'Ready for Pickup', 'In Use', 'Overdue'].includes(req.status)
                     );
                     instanceRequests.forEach(req => {
                         const start = parseISO(req.requestedStartDate);
                         const end = parseISO(req.requestedEndDate);
                         if (start && end && start <= end) {
                             const interval = eachDayOfInterval({ start, end });
-                            interval.forEach(day => booked.add(format(day, 'yyyy-MM-dd')));
+                            const timeRange = `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+                            interval.forEach(day => {
+                                const dayStr = format(day, 'yyyy-MM-dd');
+                                const existing = booked.get(dayStr) || [];
+                                existing.push(timeRange);
+                                booked.set(dayStr, existing);
+                            });
                         }
                     });
                 } else {
                     const allRequests: RoomRequest[] = await getAllRoomRequestsApi();
                     const instanceRequests = allRequests.filter(req => 
                         req.instanceId === instance.id &&
-                        ['Ready for Check-in', 'Overdue'].includes(req.status)
+                        ['Approved', 'Ready for Check-in', 'In Use', 'Overdue'].includes(req.status)
                     );
                      instanceRequests.forEach(req => {
                         const start = parseISO(req.requestedStartDate);
                         const end = parseISO(req.requestedEndDate);
                         if (start && end && start <= end) {
                             const interval = eachDayOfInterval({ start, end });
-                            interval.forEach(day => booked.add(format(day, 'yyyy-MM-dd')));
+                            const timeRange = `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+                            interval.forEach(day => {
+                                const dayStr = format(day, 'yyyy-MM-dd');
+                                const existing = booked.get(dayStr) || [];
+                                existing.push(timeRange);
+                                booked.set(dayStr, existing);
+                            });
                         }
                     });
                 }
@@ -159,7 +172,8 @@ const InstanceCalendar: React.FC<{
 
         return allDays.map(day => {
             const dayString = format(day, 'yyyy-MM-dd');
-            const isBooked = bookedDates.has(dayString);
+            const bookings = bookedDates.get(dayString);
+            const isBooked = bookings && bookings.length > 0;
             const isBlocked = blockedDates.has(dayString);
 
             let classes = 'h-8 w-8 flex items-center justify-center rounded-full text-xs transition-colors cursor-default';
@@ -167,7 +181,7 @@ const InstanceCalendar: React.FC<{
             if (!isSameMonth(day, monthStart)) {
                 classes += ' text-slate-400 dark:text-slate-500';
             } else if (isBooked) {
-                classes += ' bg-rose-200 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 font-semibold';
+                classes += ' bg-rose-200 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 font-semibold cursor-help';
             } else if (isBlocked) {
                 classes += ' bg-slate-300 dark:bg-slate-800 text-slate-800 dark:text-slate-200 line-through';
             } else {
@@ -177,7 +191,7 @@ const InstanceCalendar: React.FC<{
                  classes += ' ring-2 ring-sky-500';
             }
              return (
-                <div key={day.toString()} className="flex justify-center items-center py-1">
+                <div key={day.toString()} className="flex justify-center items-center py-1" title={isBooked ? `Reserved:\n${bookings?.join('\n')}` : (isBlocked ? 'Blocked by Admin' : 'Available')}>
                     <div className={classes}>
                         <span>{format(day, 'd')}</span>
                     </div>
@@ -372,7 +386,8 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, areaName, onC
                                                     >
                                                         <div className="flex justify-between items-center">
                                                             <p className="font-semibold text-slate-900 dark:text-white">
-                                                                {isEquipment ? (instance as InventoryInstance).serialNumber : (instance as RoomInstance).name}
+                                                                {/* FIX: Show Asset Tag instead of Serial Number if available for equipment */}
+                                                                {isEquipment ? (instance as InventoryInstance).assetTag || (instance as InventoryInstance).serialNumber : (instance as RoomInstance).name}
                                                             </p>
                                                             {isActuallyAvailable ? (
                                                                 <span className="px-2 py-1 text-xs font-medium rounded-full capitalize bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Available</span>
