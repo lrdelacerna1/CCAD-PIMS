@@ -7,7 +7,6 @@ import { AuthLayout } from '../components/layout/AuthLayout';
 import { MailIcon } from '../components/Icons';
 import { requestPasswordResetApi } from '../../backend/api/auth';
 
-
 const ForgotPasswordPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
@@ -19,10 +18,10 @@ const ForgotPasswordPage: React.FC = () => {
         setMessage('');
         try {
             await requestPasswordResetApi(email);
-            setMessage(`If an account with email ${email} exists, a password reset link has been sent.`);
+            setMessage(`If an account with that email address exists, a password reset link has been sent. Please check your inbox and spam folder.`);
         } catch (err: any) {
             // For security, show the same message even if the API fails or email doesn't exist.
-            setMessage(`If an account with email ${email} exists, a password reset link has been sent.`);
+            setMessage(`If an account with that email address exists, a password reset link has been sent. Please check your inbox and spam folder.`);
         } finally {
             setIsLoading(false);
         }
@@ -33,7 +32,7 @@ const ForgotPasswordPage: React.FC = () => {
             <Card>
                 <h1 className="text-xl font-bold dark:text-white">Forgot your password?</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Enter your email and we will send you a link to reset your password. (A link will be logged to the console).
+                    Enter your email address and we will send you a link to reset your password.
                 </p>
                 {message ? (
                     <p className="text-sm text-green-500">{message}</p>
@@ -43,7 +42,7 @@ const ForgotPasswordPage: React.FC = () => {
                         <Button type="submit" isLoading={isLoading}>Send reset link</Button>
                     </form>
                 )}
-                 <p className="text-sm font-light text-slate-500 dark:text-slate-400 mt-4">
+                <p className="text-sm font-light text-slate-500 dark:text-slate-400 mt-4">
                     Remembered your password? <Link to="/login" target="_self" className="font-medium text-up-maroon-700 hover:underline dark:text-up-maroon-500">Login here</Link>
                 </p>
             </Card>

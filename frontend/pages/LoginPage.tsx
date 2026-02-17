@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -23,27 +22,24 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-  
+
     try {
       await login(email, password);
       navigate('/');
     } catch (err: any) {
-      console.error('Login error:', err);
-      
-      // Handle invalid credentials
       if (
-        err.code === 'auth/invalid-credential' || 
-        err.code === 'auth/wrong-password' || 
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/wrong-password' ||
         err.code === 'auth/user-not-found' ||
         err.message?.includes('invalid-credential')
       ) {
-        setError('Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button below.');
+        setError('The email or password you entered is incorrect. If you signed up with Google, please use the "Sign in with Google" button below.');
       } else if (err.code === 'auth/invalid-email') {
         setError('Please enter a valid email address.');
       } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed login attempts. Please try again later.');
+        setError('Your account has been temporarily locked due to too many failed attempts. Please try again later or reset your password.');
       } else {
-        setError(err.message || 'An error occurred during login.');
+        setError('We could not sign you in at this time. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -57,7 +53,7 @@ const LoginPage: React.FC = () => {
       await signInWithGoogle();
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google.');
+      setError('We could not sign you in with Google. Please try again.');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -99,7 +95,7 @@ const LoginPage: React.FC = () => {
             Sign in with Google
           </button>
           <p className="text-sm font-light text-slate-500 dark:text-slate-400">
-            Don’t have an account yet? <Link to="/register" target="_self" className="font-medium text-up-maroon-700 hover:underline dark:text-up-maroon-400">Sign up</Link>
+            Don't have an account yet? <Link to="/register" target="_self" className="font-medium text-up-maroon-700 hover:underline dark:text-up-maroon-400">Sign up</Link>
           </p>
         </form>
       </Card>

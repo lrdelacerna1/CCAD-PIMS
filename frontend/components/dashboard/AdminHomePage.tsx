@@ -42,7 +42,7 @@ const AdminHomePage: React.FC = () => {
                 setManagedAreaIds(ids);
             }
         } catch (err) {
-            setError('Failed to load dashboard data. Please try again later.');
+            setError('We couldn’t load your dashboard at the moment. Please refresh the page or try again later.');
         } finally {
             setIsLoading(false);
         }

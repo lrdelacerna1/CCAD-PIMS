@@ -17,7 +17,6 @@ import ReservationDetailsModal from '../components/reservations/ReservationDetai
 
 type AnyRequest = EquipmentRequest | RoomRequest;
 
-// Simple helper — both request types store areaId as a plain string
 function getAreaId(req: AnyRequest): string {
     return (req as any).areaId || '';
 }
@@ -79,7 +78,7 @@ const AllRequestsPage: React.FC = () => {
             setUsers(usersData);
             setSettings(settingsData);
         } catch (err) {
-            setError('Failed to load request data.');
+            setError('We could not load the reservations at this time. Please refresh the page to try again.');
         } finally {
             setIsLoading(false);
         }
@@ -92,7 +91,6 @@ const AllRequestsPage: React.FC = () => {
     useEffect(() => {
         const initialStatus = (location.state as { statusFilter?: string })?.statusFilter;
         if (initialStatus && requests.length > 0 && !hasRunTabLogic.current) {
-            // Map pickup/check-in equivalents so room requests are found correctly
             const roomEquivalent = initialStatus === 'Ready for Pickup' ? 'Ready for Check-in' : initialStatus;
             const hasPendingRoomRequests = requests.some(
                 r => (r.status === initialStatus || r.status === roomEquivalent) && !('requestedItems' in r)
@@ -117,7 +115,7 @@ const AllRequestsPage: React.FC = () => {
             }
             fetchData();
         } catch (err) {
-            setError('Failed to update request status. Please try again.');
+            setError('Something went wrong while updating this reservation. Please try again.');
         } finally {
             setActionInProgress(null);
         }
@@ -126,7 +124,6 @@ const AllRequestsPage: React.FC = () => {
     const usersMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
-    // Derive managed area IDs from area.adminIds — the source of truth
     const managedAreaIds = useMemo(() => {
         const isSuperAdmin = user?.role === 'superadmin';
         if (isSuperAdmin) return new Set(areas.map(a => a.id));
@@ -289,9 +286,9 @@ const AllRequestsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {error && <p className="text-red-500">{error}</p>}
+                    {error && <p className="text-red-500 mb-4">{error}</p>}
                     {isLoading ? (
-                        <p className="dark:text-white">Loading...</p>
+                        <p className="dark:text-white text-center">Loading reservations...</p>
                     ) : (
                         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto border border-slate-200 dark:border-slate-700">
                             <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">

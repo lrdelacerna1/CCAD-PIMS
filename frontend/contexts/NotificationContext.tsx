@@ -30,8 +30,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
             setNotifications(fetchedNotifications);
             setError(null);
         } catch (err: any) {
-            console.error("Failed to fetch notifications:", err);
-            setError(err.message || "Failed to fetch notifications");
+            console.error("Unable to load notifications. Please try again.", err);
+            setError(err.message || "Unable to load notifications. Please try again.");
         } finally {
             setIsLoading(false);
         }

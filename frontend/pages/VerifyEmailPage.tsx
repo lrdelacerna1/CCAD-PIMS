@@ -15,13 +15,13 @@ const VerifyEmailPage: React.FC = () => {
         try {
             await reloadUser();
         } catch (err: any) {
-            setError(err.message || 'Failed to check verification status.');
+            setError('We could not check your verification status. Please refresh the page and try again.');
         }
     }, [reloadUser]);
 
     useEffect(() => {
         if (user?.emailVerified) {
-            navigate('/'); // Redirect immediately, no delay
+            navigate('/');
         }
     }, [user, navigate]);
 
@@ -30,11 +30,10 @@ const VerifyEmailPage: React.FC = () => {
 
         const intervalId = setInterval(() => {
             handleCheckVerification();
-        }, 5000); // Check every 5 seconds
+        }, 5000);
 
         return () => clearInterval(intervalId);
     }, [handleCheckVerification, user]);
-
 
     if (!user) {
         return <Navigate to="/login" />;
@@ -59,9 +58,9 @@ const VerifyEmailPage: React.FC = () => {
         setError('');
         try {
             await sendVerificationEmail();
-            setMessage('A new verification email has been sent to your inbox.');
+            setMessage('A new verification email has been sent. Please check your inbox and spam folder.');
         } catch (err: any) {
-            setError(err.message || 'Failed to send verification email.');
+            setError('We were unable to send the verification email. Please wait a moment and try again.');
         } finally {
             setIsSending(false);
         }
@@ -71,16 +70,16 @@ const VerifyEmailPage: React.FC = () => {
         <div className="container mx-auto p-6 max-w-md text-center mt-20">
             <h1 className="text-2xl font-bold mb-4 dark:text-white">Verify Your Email</h1>
             <p className="text-slate-600 dark:text-slate-300 mb-6">
-                Thank you for registering! Your account is not fully active until your email address is verified. 
-                Please check your inbox for a verification link we just sent to <strong>{user?.email}</strong>.
+                Thank you for registering! Your account is not fully active until your email address is verified.
+                Please check your inbox for a verification link we just sent to <strong>{user?.emailAddress}</strong>.
             </p>
-            
-            {message && <p className="text-green-600 mb-4">{message}</p>}
-            {error && <p className="text-red-600 mb-4">{error}</p>}
+
+            {message && <p className="text-green-600 dark:text-green-400 mb-4">{message}</p>}
+            {error && <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                    onClick={handleResend} 
+                <Button
+                    onClick={handleResend}
                     disabled={isSending}
                     className="w-full"
                 >
@@ -93,7 +92,7 @@ const VerifyEmailPage: React.FC = () => {
                 </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-                We are automatically checking for your email verification. This page will update once you are verified.
+                This page will automatically update once your email is verified. You can also click the button above if you did not receive the email.
             </p>
         </div>
     );

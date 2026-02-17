@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
@@ -8,13 +7,11 @@ import { getEquipmentRequestsByUserIdApi, updateEquipmentRequestStatusApi } from
 import { getRoomRequestsByUserIdApi, updateRoomRequestStatusApi } from '../../backend/api/roomRequests';
 import { getPenaltiesByUserIdApi } from '../../backend/api/penalties';
 import { Button } from '../components/ui/Button';
-import { format, startOfDay, endOfDay, isBefore, isAfter, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { SearchIcon, ClockIcon, XIcon } from '../components/Icons';
 import ReservationDetailsModal from '../components/reservations/ReservationDetailsModal';
-
-// --- Reusable Components ---
 
 type AnyRequest = EquipmentRequest | RoomRequest;
 
@@ -37,7 +34,6 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     return <span className={`${baseClasses} ${colors[colorKey] || colors['closed']}`}>{status}</span>;
 };
 
-
 const RequestsTable: React.FC<{
     requests: AnyRequest[];
     onCancel: (req: AnyRequest) => void;
@@ -45,16 +41,13 @@ const RequestsTable: React.FC<{
     areasMap: Map<string, string>;
     resourceType: 'equipment' | 'room';
 }> = ({ requests, onCancel, onRowClick, areasMap, resourceType }) => {
-    
+
     const getItemName = (req: AnyRequest) => {
         if ('requestedItems' in req) {
-            // FIX: Join names of all requested items to show all reserved instances
             return req.requestedItems.map(i => i.name).join(', ') || 'N/A';
         } else if ('requestedRoom' in req) {
              const rr = (req as any).requestedRoom;
-             if (Array.isArray(rr)) {
-                 return rr.map((r: any) => r.name).join(', ') || 'N/A';
-             }
+             if (Array.isArray(rr)) return rr.map((r: any) => r.name).join(', ') || 'N/A';
              return (rr as any).name || 'N/A';
         }
         return 'N/A';
@@ -65,18 +58,12 @@ const RequestsTable: React.FC<{
         if ('requestedItems' in req) {
             areaId = req.requestedItems[0]?.areaId;
         } else {
-             // Prioritize root level areaId if available
              if ('areaId' in req && (req as any).areaId) {
                  areaId = (req as any).areaId;
              } else if ('requestedRoom' in req) {
                  const rr = (req as any).requestedRoom;
-                 if (Array.isArray(rr) && rr.length > 0) {
-                     areaId = rr[0].areaId;
-                 } else if (!Array.isArray(rr) && rr) {
-                     areaId = rr.areaId;
-                 }
-             } else if ('roomTypeId' in req) {
-                 // Fallback to roomTypeId check in areas list if needed
+                 if (Array.isArray(rr) && rr.length > 0) areaId = rr[0].areaId;
+                 else if (!Array.isArray(rr) && rr) areaId = rr.areaId;
              }
         }
         return areasMap.get(areaId) || 'Unknown Area';
@@ -85,39 +72,26 @@ const RequestsTable: React.FC<{
     const getDateTimeString = (req: AnyRequest) => {
         const createDate = (dateStr: string) => {
             if (!dateStr) return null;
-            let d;
-            if (dateStr.includes('T')) {
-                d = new Date(dateStr);
-            } else {
-                d = new Date(dateStr + 'T00:00:00Z');
-            }
+            const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00Z');
             return isNaN(d.getTime()) ? null : d;
-        }
-
+        };
         const startDate = createDate(req.requestedStartDate);
-        if (!startDate) return "Invalid date";
-
+        if (!startDate) return "Date unavailable";
         const start = format(startDate, 'MMM d, yyyy');
-
         if ('requestedItems' in req) {
             const endDate = createDate(req.requestedEndDate);
             if (!endDate) return start;
             const end = format(endDate, 'MMM d, yyyy');
-            
             const startTime = (req as any).requestedStartTime;
             const endTime = (req as any).requestedEndTime;
-            
             const datePart = start === end ? start : `${start} to ${end}`;
-            
-            if (startTime && endTime) {
-                 return `${datePart} at ${startTime} - ${endTime}`;
-            }
-            
+            if (startTime && endTime) return `${datePart} at ${startTime} - ${endTime}`;
             return datePart;
         } else {
             return `${start} at ${'requestedStartTime' in req ? req.requestedStartTime : ''} - ${'requestedEndTime' in req ? req.requestedEndTime : ''}`;
         }
     };
+
     const canCancel = (req: AnyRequest) => {
         const cancellableEquipmentStatuses: EquipmentRequestStatus[] = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Ready for Pickup'];
         const cancellableRoomStatuses: RoomRequestStatus[] = ['Pending Endorsement', 'Pending Approval', 'Approved', 'Ready for Check-in'];
@@ -139,15 +113,13 @@ const RequestsTable: React.FC<{
                     </tr>
                 </thead>
                 <tbody>
-                    {requests.map((req, index) => (
-                        <tr 
-                            key={req.id} 
+                    {requests.map((req) => (
+                        <tr
+                            key={req.id}
                             onClick={() => onRowClick(req)}
                             className={`bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 cursor-pointer ${req.status === 'Overdue' ? 'bg-rose-50 dark:bg-rose-900/20' : ''}`}
                         >
-                            <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap dark:text-white">
-                                {getItemName(req)}
-                            </td>
+                            <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap dark:text-white">{getItemName(req)}</td>
                             <td className="px-6 py-4">{getAreaName(req)}</td>
                             <td className="px-6 py-4">{getDateTimeString(req)}</td>
                             <td className="px-6 py-4"><StatusBadge status={req.status} /></td>
@@ -166,17 +138,14 @@ const RequestsTable: React.FC<{
     );
 };
 
-
 const PenaltyHistoryList: React.FC<{ penalties: Penalty[], requests: (EquipmentRequest | RoomRequest)[] }> = ({ penalties, requests }) => {
     if (penalties.length === 0) {
         return <p className="text-slate-500 dark:text-slate-400 text-center py-6">You have no outstanding or past penalties.</p>;
     }
-
     const getRequestPurpose = (penalty: Penalty) => {
-        const req = requests.find(r => r.id === (penalty.requestId));
+        const req = requests.find(r => r.id === penalty.requestId);
         return req?.purpose || 'General Penalty';
     };
-
     return (
         <div className="space-y-4">
             {penalties.map(penalty => (
@@ -230,48 +199,29 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
         };
         fetchData();
     }, [userId]);
-    
+
     const getType = (req: AnyRequest) => 'requestedItems' in req ? 'Equipment' : 'Room';
     const getName = (req: AnyRequest) => {
-        if ('requestedItems' in req) {
-            return req.requestedItems.map(i => i.name).join(', ');
-        } else {
-             const rr = (req as any).requestedRoom;
-             if (Array.isArray(rr)) {
-                 return rr.map((r: any) => r.name).join(', ');
-             }
-             return (rr as any).name || 'N/A';
-        }
+        if ('requestedItems' in req) return req.requestedItems.map(i => i.name).join(', ');
+        const rr = (req as any).requestedRoom;
+        if (Array.isArray(rr)) return rr.map((r: any) => r.name).join(', ');
+        return (rr as any).name || 'N/A';
     };
 
     const filteredRequests = useMemo(() => {
         let filtered = allRequests;
-
-        if (typeFilter !== 'all') {
-            filtered = filtered.filter(req => (typeFilter === 'equipment') === ('requestedItems' in req));
-        }
-
-        if (statusFilter !== 'all') {
-             if (statusFilter === 'completed') {
-                 filtered = filtered.filter(req => ['Returned', 'Completed', 'Closed'].includes(req.status));
-             } else if (statusFilter === 'cancelled') {
-                 filtered = filtered.filter(req => ['Cancelled', 'Rejected'].includes(req.status));
-             }
-        }
-
+        if (typeFilter !== 'all') filtered = filtered.filter(req => (typeFilter === 'equipment') === ('requestedItems' in req));
+        if (statusFilter === 'completed') filtered = filtered.filter(req => ['Returned', 'Completed', 'Closed'].includes(req.status));
+        else if (statusFilter === 'cancelled') filtered = filtered.filter(req => ['Cancelled', 'Rejected'].includes(req.status));
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(req => 
-                req.purpose.toLowerCase().includes(query) ||
-                getName(req).toLowerCase().includes(query)
-            );
+            filtered = filtered.filter(req => req.purpose.toLowerCase().includes(query) || getName(req).toLowerCase().includes(query));
         }
-
         return filtered.sort((a, b) => new Date(b.dateFiled).getTime() - new Date(a.dateFiled).getTime());
     }, [allRequests, searchQuery, typeFilter, statusFilter]);
 
     return (
-         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center flex-shrink-0">
                     <h2 className="text-xl font-bold dark:text-white">Complete Request History</h2>
@@ -281,39 +231,18 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
                 </div>
                 <div className="p-4 flex-shrink-0">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                         <Input
-                            placeholder="Search by purpose or item name..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            icon={<SearchIcon className="w-4 h-4" />}
-                        />
-                        <Select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value as any)}
-                            options={[
-                                { value: 'all', label: 'All Types' },
-                                { value: 'equipment', label: 'Equipment' },
-                                { value: 'room', label: 'Rooms' },
-                            ]}
-                        />
-                         <Select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value as any)}
-                            options={[
-                                { value: 'all', label: 'All Statuses' },
-                                { value: 'completed', label: 'Completed/Returned' },
-                                { value: 'cancelled', label: 'Cancelled/Rejected' },
-                            ]}
-                        />
+                        <Input placeholder="Search by purpose or item name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} icon={<SearchIcon className="w-4 h-4" />} />
+                        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} options={[{ value: 'all', label: 'All Types' }, { value: 'equipment', label: 'Equipment' }, { value: 'room', label: 'Rooms' }]} />
+                        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} options={[{ value: 'all', label: 'All Statuses' }, { value: 'completed', label: 'Completed/Returned' }, { value: 'cancelled', label: 'Cancelled/Rejected' }]} />
                     </div>
                 </div>
                 <div className="px-4 pb-4 overflow-y-auto flex-grow">
                     {isLoading ? (
                         <p className="text-center py-8">Loading history...</p>
                     ) : filteredRequests.length === 0 ? (
-                        <p className="text-center text-slate-500 dark:text-slate-400 py-8">No history found.</p>
+                        <p className="text-center text-slate-500 dark:text-slate-400 py-8">No history found matching your filters.</p>
                     ) : (
-                         <div className="overflow-x-auto relative border sm:rounded-lg dark:border-slate-700">
+                        <div className="overflow-x-auto relative border sm:rounded-lg dark:border-slate-700">
                             <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
                                 <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-400">
                                     <tr>
@@ -347,7 +276,6 @@ const AllUserHistoryModal: React.FC<{ userId: string; onClose: () => void; areas
     );
 };
 
-
 const MyReservationsPage: React.FC = () => {
     const { user } = useAuth();
     const [equipmentRequests, setEquipmentRequests] = useState<EquipmentRequest[]>([]);
@@ -356,14 +284,13 @@ const MyReservationsPage: React.FC = () => {
     const [areas, setAreas] = useState<Area[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    
+
     const [mainTab, setMainTab] = useState<'equipment' | 'rooms' | 'accountability'>('equipment');
-    
     const [searchQuery, setSearchQuery] = useState('');
     const [areaFilter, setAreaFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-    
+
     const [requestToCancel, setRequestToCancel] = useState<AnyRequest | null>(null);
     const [viewingRequest, setViewingRequest] = useState<AnyRequest | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
@@ -385,22 +312,19 @@ const MyReservationsPage: React.FC = () => {
             setAreas(areasData);
             setPenalties(penData);
         } catch (err) {
-            setError('Failed to load your data.');
+            setError('We could not load your reservations. Please refresh the page to try again.');
         } finally {
             setIsLoading(false);
         }
     }, [user]);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const areasMap = useMemo(() => new Map(areas.map(a => [a.id, a.name])), [areas]);
 
     const getAreaIdForFilter = (req: AnyRequest) => {
         if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems[0].areaId;
         if ('areaId' in req && (req as any).areaId) return (req as any).areaId;
-        
         if ('requestedRoom' in req) {
              const rr = (req as any).requestedRoom;
              if (Array.isArray(rr) && rr.length > 0) return rr[0].areaId;
@@ -408,7 +332,7 @@ const MyReservationsPage: React.FC = () => {
         }
         return '';
     };
-    
+
     const getItemNameForFilter = (req: AnyRequest) => {
          if ('requestedItems' in req && req.requestedItems.length > 0) return req.requestedItems.map(i => i.name).join(' ');
          if ('requestedRoom' in req) {
@@ -422,30 +346,23 @@ const MyReservationsPage: React.FC = () => {
     const activeRequests = useMemo(() => {
         const activeEq = equipmentRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
         const activeRooms = roomRequests.filter(req => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(req.status));
-        
         let filtered = mainTab === 'equipment' ? activeEq : activeRooms;
-
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(req => req.status === statusFilter);
-        }
-        if (areaFilter !== 'all') {
-             filtered = filtered.filter(req => getAreaIdForFilter(req) === areaFilter);
-        }
+        if (statusFilter !== 'all') filtered = filtered.filter(req => req.status === statusFilter);
+        if (areaFilter !== 'all') filtered = filtered.filter(req => getAreaIdForFilter(req) === areaFilter);
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
-            filtered = filtered.filter(req => 
+            filtered = filtered.filter(req =>
                 req.purpose.toLowerCase().includes(lowercasedQuery) ||
                 getItemNameForFilter(req).toLowerCase().includes(lowercasedQuery)
             );
         }
-
         return filtered.sort((a, b) => {
             const dateA = new Date(a.dateFiled).getTime();
             const dateB = new Date(b.dateFiled).getTime();
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
     }, [equipmentRequests, roomRequests, mainTab, searchQuery, areaFilter, statusFilter, sortOrder]);
-    
+
     const handleConfirmCancel = async () => {
         if (!requestToCancel) return;
         setIsCancelling(true);
@@ -458,21 +375,20 @@ const MyReservationsPage: React.FC = () => {
             setRequestToCancel(null);
             fetchData();
         } catch (err) {
-            setError('Failed to cancel the request.');
+            setError('We could not cancel your request. Please try again.');
         } finally {
             setIsCancelling(false);
         }
     };
-    
-    const areaFilterOptions = useMemo(() => {
-        return [{ value: 'all', label: 'All Areas' }, ...areas.map(a => ({ value: a.id, label: a.name }))];
-    }, [areas]);
+
+    const areaFilterOptions = useMemo(() => [
+        { value: 'all', label: 'All Areas' },
+        ...areas.map(a => ({ value: a.id, label: a.name }))
+    ], [areas]);
 
     const statusFilterOptions = useMemo(() => {
         const allStatuses = mainTab === 'equipment' ? AllEquipmentRequestStatuses : AllRoomRequestStatuses;
-        // Filter out completed/cancelled statuses from the active view filter options
         const activeStatuses = allStatuses.filter(s => !['Cancelled', 'Rejected', 'Closed', 'Returned', 'Completed'].includes(s));
-        
         return [
             { label: 'All Active Statuses', value: 'all' },
             ...[...activeStatuses].sort((a: string, b: string) => a.localeCompare(b)).map(s => ({ label: s, value: s }))
@@ -481,9 +397,9 @@ const MyReservationsPage: React.FC = () => {
 
     const activeTabClasses = "border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400 font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300";
-    
+
     const renderEmptyState = (tab: string, resource: string) => (
-         <p className="text-slate-500 dark:text-slate-400 text-center py-4">
+        <p className="text-slate-500 dark:text-slate-400 text-center py-4">
             You have no active {resource} reservations matching your filters.
             <br/><span className="text-xs">Check "History" for completed or cancelled requests.</span>
         </p>
@@ -495,8 +411,7 @@ const MyReservationsPage: React.FC = () => {
         <div className="container mx-auto p-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
                 <h1 className="text-3xl font-bold dark:text-white font-heading">My Reservations</h1>
-                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    {/* Conditionally render buttons based on active tab */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     {mainTab === 'equipment' && (
                         <Link to="/catalog" state={{ activeTab: 'equipment' }} target="_self">
                             <Button className="!w-full sm:!w-auto">+ Request Equipment</Button>
@@ -507,18 +422,12 @@ const MyReservationsPage: React.FC = () => {
                             <Button className="!w-full sm:!w-auto">+ Request a Room</Button>
                         </Link>
                     )}
-                    <Button
-                        variant="secondary"
-                        className="!w-full sm:!w-auto"
-                        onClick={() => setIsHistoryModalOpen(true)}
-                        title="View Full History"
-                    >
+                    <Button variant="secondary" className="!w-full sm:!w-auto" onClick={() => setIsHistoryModalOpen(true)} title="View Full History">
                         <ClockIcon className="w-5 h-5" />
                     </Button>
                 </div>
             </div>
 
-            {/* Main Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     <button onClick={() => setMainTab('equipment')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${mainTab === 'equipment' ? activeTabClasses : inactiveTabClasses}`}>Equipment</button>
@@ -526,95 +435,58 @@ const MyReservationsPage: React.FC = () => {
                     <button onClick={() => setMainTab('accountability')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${mainTab === 'accountability' ? activeTabClasses : inactiveTabClasses}`}>Accountability</button>
                 </nav>
             </div>
-            
-            {/* Filter Bar */}
+
             {(mainTab === 'equipment' || mainTab === 'rooms') && (
                 <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Input 
-                            label="Search"
-                            id="search-reservations"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={searchPlaceholder}
-                            icon={<SearchIcon className="w-5 h-5" />}
-                        />
-                        <Select
-                            label="Filter by area"
-                            id="area-filter"
-                            value={areaFilter}
-                            onChange={(e) => setAreaFilter(e.target.value)}
-                            options={areaFilterOptions}
-                        />
-                         <Select
-                            label="Filter by status"
-                            id="status-filter"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            options={statusFilterOptions}
-                        />
-                        <Select
-                            label="Sort by date filed"
-                            id="sort-order"
-                            value={sortOrder}
-                            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-                            options={[
-                                { value: 'newest', label: 'Newest First' },
-                                { value: 'oldest', label: 'Oldest First' },
-                            ]}
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Input label="Search" id="search-reservations" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={searchPlaceholder} icon={<SearchIcon className="w-5 h-5" />} />
+                        <Select label="Filter by area" id="area-filter" value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} options={areaFilterOptions} />
+                        <Select label="Filter by status" id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={statusFilterOptions} />
+                        <Select label="Sort by date filed" id="sort-order" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')} options={[{ value: 'newest', label: 'Newest First' }, { value: 'oldest', label: 'Oldest First' }]} />
                     </div>
                 </div>
             )}
-            
-            {/* Content Area */}
-            {isLoading && <p className="dark:text-white text-center">Loading...</p>}
+
+            {isLoading && <p className="dark:text-white text-center">Loading your reservations...</p>}
             {error && <p className="text-red-500 text-center">{error}</p>}
-            
+
             {!isLoading && !error && (
                 <div>
                     {mainTab === 'equipment' && (
                         <div className="space-y-4">
-                           {activeRequests.length > 0 ? (
-                               <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" />
-                           ) : renderEmptyState('Active', 'equipment')}
+                            {activeRequests.length > 0
+                                ? <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="equipment" />
+                                : renderEmptyState('Active', 'equipment')}
                         </div>
                     )}
                     {mainTab === 'rooms' && (
-                         <div className="space-y-4">
-                           {activeRequests.length > 0 ? (
-                               <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" />
-                           ) : renderEmptyState('Active', 'room')}
+                        <div className="space-y-4">
+                            {activeRequests.length > 0
+                                ? <RequestsTable requests={activeRequests} onCancel={setRequestToCancel} onRowClick={setViewingRequest} areasMap={areasMap} resourceType="room" />
+                                : renderEmptyState('Active', 'room')}
                         </div>
                     )}
                     {mainTab === 'accountability' && <PenaltyHistoryList penalties={penalties} requests={[...equipmentRequests, ...roomRequests]} />}
                 </div>
             )}
-            
+
             {requestToCancel && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setRequestToCancel(null)}>
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white font-heading">Confirm Cancellation</h3>
-                            <p className="mt-2 text-slate-600 dark:text-slate-300">Are you sure you want to cancel this request?</p>
+                            <p className="mt-2 text-slate-600 dark:text-slate-300">Are you sure you want to cancel this request? This action cannot be undone.</p>
                         </div>
                         <div className="p-6 flex justify-end gap-3 border-t dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
-                            <Button onClick={() => setRequestToCancel(null)} className="!w-auto" variant="secondary">Back</Button>
-                            <Button onClick={handleConfirmCancel} isLoading={isCancelling} variant="danger" className="!w-auto">Confirm Cancel</Button>
+                            <Button onClick={() => setRequestToCancel(null)} className="!w-auto" variant="secondary">Go Back</Button>
+                            <Button onClick={handleConfirmCancel} isLoading={isCancelling} variant="danger" className="!w-auto">Confirm Cancellation</Button>
                         </div>
                     </div>
                 </div>
             )}
-             {viewingRequest && (
-                <ReservationDetailsModal
-                    reservation={viewingRequest}
-                    onClose={() => setViewingRequest(null)}
-                />
-            )}
 
-            {isHistoryModalOpen && user && (
-                <AllUserHistoryModal userId={user.id} onClose={() => setIsHistoryModalOpen(false)} areasMap={areasMap} />
-            )}
+            {viewingRequest && <ReservationDetailsModal reservation={viewingRequest} onClose={() => setViewingRequest(null)} />}
+            {isHistoryModalOpen && user && <AllUserHistoryModal userId={user.id} onClose={() => setIsHistoryModalOpen(false)} areasMap={areasMap} />}
         </div>
     );
 };

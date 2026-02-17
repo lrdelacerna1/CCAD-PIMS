@@ -67,7 +67,7 @@ const AreaContent: React.FC<{ area: Area }> = ({ area }) => {
                 });
                 setRequests(areaRequests);
             } catch (err) {
-                setError('Failed to load request data.');
+                setError('We couldn’t load your request data at the moment. Please try again later.');
             } finally {
                 setIsLoading(false);
             }

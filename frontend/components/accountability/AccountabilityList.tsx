@@ -19,7 +19,7 @@ const AccountabilityList: React.FC = () => {
         const allPenalties = await getAllPenaltiesApi();
         setPenalties(allPenalties);
       } catch (err: any) {
-        setError(err.message || 'Failed to fetch penalties.');
+        setError(err.message || 'Failed to load penalties.');
       } finally {
         setIsLoading(false);
       }

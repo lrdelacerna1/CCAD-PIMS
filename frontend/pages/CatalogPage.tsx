@@ -63,7 +63,7 @@ const CatalogPage: React.FC = () => {
                 setAreas(areasData || []);
                 setSettings(settingsData || null);
             } catch (err) {
-                setError('Failed to load page essentials.');
+                setError('We could not load the page. Please refresh and try again.');
                 setAreas([]);
                 setSettings(null);
             }
@@ -71,12 +71,11 @@ const CatalogPage: React.FC = () => {
         fetchStaticData();
     }, []);
 
-    // Extracted as useCallback so handleSuccessRequest can call it directly
     const fetchCatalogData = useCallback(async () => {
         if (new Date(endDate) < new Date(startDate)) {
             setEquipmentInventory([]);
             setRoomInventory([]);
-            setError("End date cannot be before start date.");
+            setError('The end date cannot be earlier than the start date. Please adjust your dates and try again.');
             return;
         }
 
@@ -91,7 +90,7 @@ const CatalogPage: React.FC = () => {
                 setRoomInventory(roomData || []);
             }
         } catch (err) {
-            setError('Failed to load catalog data.');
+            setError('We could not load the catalog at this time. Please refresh the page to try again.');
         } finally {
             setIsLoading(false);
         }
@@ -172,10 +171,8 @@ const CatalogPage: React.FC = () => {
 
     const handleSuccessRequest = () => {
         setIsRequestModalOpen(false);
-        // Clear the cart for the active tab
         if (activeTab === 'equipment') setEquipmentCart(new Map());
         else setRoomCart(new Map());
-        // Immediately refetch catalog so newly blocked instances/rooms show as unavailable
         fetchCatalogData();
     };
 
@@ -191,7 +188,6 @@ const CatalogPage: React.FC = () => {
 
     return (
         <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
-            {/* Sidebar / Cart */}
             <aside className={`fixed inset-y-0 right-0 z-50 w-full ${isSidebarCollapsed ? 'sm:w-16 lg:w-16' : 'sm:w-60 lg:w-60'} lg:relative transition-all duration-300 transform ${isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
                 <Cart
                     items={activeCart}
@@ -218,7 +214,6 @@ const CatalogPage: React.FC = () => {
                 />
             </aside>
 
-            {/* Main Content */}
             <main className="flex-grow overflow-y-auto p-6">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold dark:text-white">Resource Catalog</h1>
@@ -274,7 +269,6 @@ const CatalogPage: React.FC = () => {
                 )}
             </main>
 
-            {/* Modals */}
             {viewingItem && (
                 <ItemDetailsModal
                     item={viewingItem}

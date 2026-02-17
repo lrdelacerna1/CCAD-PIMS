@@ -39,26 +39,26 @@ const ResetPasswordPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (password !== confirmPassword) {
-            setError('Passwords do not match.');
+            setError('The passwords you entered do not match. Please try again.');
             return;
         }
         if (!token) {
-            setError('No reset token found.');
+            setError('Your reset link appears to be incomplete. Please request a new one.');
             return;
         }
-        
+
         setIsLoading(true);
         setError('');
         setMessage('');
 
         try {
             await resetPasswordApi(token, password);
-            setMessage('Your password has been reset successfully. Redirecting to login...');
+            setMessage('Your password has been reset successfully. You will be redirected to the login page shortly.');
             setTimeout(() => {
                 navigate('/login');
             }, 3000);
         } catch (err: any) {
-            setError(err.message || 'Failed to reset password. The link may be expired.');
+            setError('Your reset link has expired or is no longer valid. Please request a new one.');
             setValidity('invalid');
         } finally {
             setIsLoading(false);
@@ -67,27 +67,27 @@ const ResetPasswordPage: React.FC = () => {
 
     const renderContent = () => {
         if (validity === 'validating') {
-            return <p className="text-center dark:text-white">Validating reset link...</p>;
+            return <p className="text-center dark:text-white">Validating your reset link...</p>;
         }
-        
+
         if (validity === 'invalid') {
             return (
                 <div className="text-center">
-                    <h1 className="text-xl font-bold dark:text-white mb-4">Invalid or Expired Link</h1>
+                    <h1 className="text-xl font-bold dark:text-white mb-4">Link Expired or Invalid</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        The password reset link is invalid or has expired. Please request a new one.
+                        This password reset link is no longer valid. Links expire after a short period for your security. Please request a new one.
                     </p>
                     <Link to="/forgot-password" target="_self" className="font-medium text-sky-600 hover:underline dark:text-sky-500 mt-4 block">
-                        Request a new link
+                        Request a new reset link
                     </Link>
                 </div>
             );
         }
-        
+
         if (message) {
             return (
-                 <div className="text-center">
-                    <h1 className="text-xl font-bold text-green-500 mb-4">Success!</h1>
+                <div className="text-center">
+                    <h1 className="text-xl font-bold text-green-500 mb-4">Password Updated!</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
                 </div>
             );

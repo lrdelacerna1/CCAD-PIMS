@@ -662,7 +662,8 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({ searchQuery, 
             setAreas(areasData);
             setAllEquipmentRequests(requestsData);
         } catch (err) {
-            setError('Failed to load inventory data.');
+            setError('We couldn’t load the inventory data right now. Please refresh the page or try again later.');
+
         } finally {
             setIsLoading(false);
         }

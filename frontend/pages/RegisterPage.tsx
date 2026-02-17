@@ -34,12 +34,12 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('The passwords you entered do not match. Please try again.');
       return;
     }
 
     if ((userType === 'student' || userType === 'faculty') && !email.endsWith('@up.edu.ph')) {
-        setError('Invalid UP Mail address. Please use your @up.edu.ph email.');
+        setError('Please use your official UP Mail address (ending in @up.edu.ph) to register as a student or faculty.');
         return;
     }
 
@@ -52,19 +52,17 @@ const RegisterPage: React.FC = () => {
             firstName,
             lastName,
             contactNumber,
-            role: userType, // Faculty gets 'faculty' role directly for manual registration
+            role: userType,
         };
 
         if (userType === 'student') {
             userData = { ...userData, studentId, program };
         }
 
-        // Manual registration - faculty role is approved immediately
         await register(userData);
-
         navigate('/verify-email');
     } catch (err: any) {
-      setError(err.message || 'An error occurred during registration.');
+      setError(err.message || 'We could not complete your registration. Please check your details and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -75,17 +73,15 @@ const RegisterPage: React.FC = () => {
     setIsGoogleLoading(true);
     try {
       const firebaseUser = await signUpWithGoogle();
-      
+
       if (firebaseUser?.email?.endsWith('@up.edu.ph')) {
-        // Show role selection modal for UP emails
         setIsRoleModalOpen(true);
       } else {
-        // Non-UP emails are automatically guests
         await updateProfile({ role: 'guest' });
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to create account with Google.');
+      setError('We could not sign you up with Google. Please try again or use the form above.');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -94,27 +90,25 @@ const RegisterPage: React.FC = () => {
   const handleRoleSelection = async (role: 'student' | 'faculty') => {
     setIsRoleModalOpen(false);
     if (!user) {
-        setError('User not found. Please try again.');
+        setError('Your session could not be found. Please try signing up again.');
         return;
     }
     try {
         if (role === 'student') {
             await updateProfile({ role: 'student' });
             navigate('/');
-        } else { // faculty - Google sign-in goes through appeal process
+        } else {
             await appealService.createFacultyAppeal(
-                user.id, 
-                user.emailAddress, 
-                user.firstName, 
+                user.id,
+                user.emailAddress,
+                user.firstName,
                 user.lastName
             );
             await updateProfile({ role: 'pending-faculty' });
-            
-            // Show pending notification
             setShowPendingNotification(true);
         }
     } catch (error) {
-        setError('Failed to update role. Please try again.');
+        setError('We could not update your account role. Please try again.');
     }
   };
 
@@ -125,47 +119,34 @@ const RegisterPage: React.FC = () => {
 
   return (
     <AuthLayout>
-      <RoleSelectionModal 
+      <RoleSelectionModal
         isOpen={isRoleModalOpen}
         onClose={() => setIsRoleModalOpen(false)}
         onSelectRole={handleRoleSelection}
       />
 
-      {/* Pending Faculty Notification Modal */}
       {showPendingNotification && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex flex-col items-center text-center">
-              {/* Icon */}
               <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
                 <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-
-              {/* Title */}
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 Faculty Access Pending
               </h3>
-
-              {/* Message */}
               <p className="text-slate-600 dark:text-slate-400 mb-6">
-                Your faculty appeal has been submitted successfully. You are currently a <strong>pending faculty</strong> member. 
+                Your faculty appeal has been submitted successfully. You are currently a <strong>pending faculty</strong> member.
                 A super administrator will review and approve your request soon.
               </p>
-
-              {/* Status Badge */}
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3 mb-6 w-full">
                 <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
                   ⏳ Status: Awaiting Approval
                 </p>
               </div>
-
-              {/* Button */}
-              <Button 
-                onClick={handlePendingNotificationClose}
-                className="w-full"
-              >
+              <Button onClick={handlePendingNotificationClose} className="w-full">
                 Continue to Dashboard
               </Button>
             </div>
@@ -178,7 +159,6 @@ const RegisterPage: React.FC = () => {
           Create a New Account
         </h1>
 
-        {/* User Type Selection */}
         <div className="flex justify-center gap-4 mb-6">
             <button onClick={() => setUserType('student')} className={`flex items-center gap-2 px-4 py-2 rounded-lg ${userType === 'student' ? 'bg-ccad-red text-white' : 'bg-slate-200 dark:bg-slate-700'}`}><AcademicCapIcon className="w-5 h-5"/> Student</button>
             <button onClick={() => setUserType('guest')} className={`flex items-center gap-2 px-4 py-2 rounded-lg ${userType === 'guest' ? 'bg-ccad-red text-white' : 'bg-slate-200 dark:bg-slate-700'}`}><UserIcon className="w-5 h-5"/> Guest</button>
@@ -186,7 +166,6 @@ const RegisterPage: React.FC = () => {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="First Name" id="firstName" type="text" value={firstName} onChange={e => setFirstName(e.target.value)} required icon={<UserIcon className="w-5 h-5"/>} />
             <Input label="Last Name" id="lastName" type="text" value={lastName} onChange={e => setLastName(e.target.value)} required icon={<UserIcon className="w-5 h-5"/>} />
@@ -194,7 +173,6 @@ const RegisterPage: React.FC = () => {
 
           <Input label={userType === 'guest' ? 'Email Address' : 'UP Mail Address'} id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required icon={<MailIcon className="w-5 h-5"/>} />
 
-          {/* Student-specific fields */}
           {userType === 'student' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Student ID" id="studentId" type="text" value={studentId} onChange={e => setStudentId(e.target.value)} required icon={<UserIcon className="w-5 h-5"/>} />
@@ -205,7 +183,7 @@ const RegisterPage: React.FC = () => {
                 onChange={(e) => setProgram(e.target.value)}
                 required
                 icon={<AcademicCapIcon className="w-5 h-5" />}
-                >
+              >
                 <option value="" disabled>Select a program</option>
                 <optgroup label="Arts and Humanities">
                     <option value="Certificate in Fine Arts (Studio Arts)">Certificate in Fine Arts (Studio Arts)</option>
@@ -233,19 +211,19 @@ const RegisterPage: React.FC = () => {
                 <optgroup label="High School">
                     <option value="High School">High School</option>
                 </optgroup>
-            </Select>
+              </Select>
             </div>
           )}
 
           <Input label="Contact Number" id="contactNumber" type="tel" value={contactNumber} onChange={e => setContactNumber(e.target.value)} icon={<PhoneIcon className="w-5 h-5"/>} pattern="[0-9]*" title="Please enter numbers only" />
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Password" id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required icon={<LockIcon className="w-5 h-5"/>} />
             <Input label="Confirm password" id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required icon={<LockIcon className="w-5 h-5"/>} />
           </div>
-          
+
           {error && <p className="text-sm text-red-500 mt-2 text-center">{error}</p>}
-          
+
           <div className="pt-2">
             <Button type="submit" isLoading={isLoading} className="w-full">Create account</Button>
           </div>
@@ -255,7 +233,7 @@ const RegisterPage: React.FC = () => {
             <span className="flex-shrink mx-4 text-sm text-slate-500 dark:text-slate-400">or</span>
             <div className="flex-grow border-t border-slate-300 dark:border-slate-600"></div>
           </div>
-          
+
           <Button variant="secondary" type="button" disabled={isGoogleLoading} onClick={handleGoogleSignUp} className="w-full">
              {isGoogleLoading ? (
                <svg className="animate-spin -ml-1 mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

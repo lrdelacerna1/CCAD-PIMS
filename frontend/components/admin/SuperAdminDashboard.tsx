@@ -25,7 +25,7 @@ const SuperAdminDashboard: React.FC = () => {
             setUsers(allUsers);
             setAreas(allAreas);
         } catch (err) {
-            setError('Failed to fetch dashboard data.');
+            setError('Failed to load dashboard data.');
         } finally {
             setIsLoading(false);
         }

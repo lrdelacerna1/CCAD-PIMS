@@ -32,8 +32,7 @@ const SuperAdminDashboard: React.FC = () => {
             const fetchedAppeals = await appealService.getAllAppeals();
             setAllAppeals(fetchedAppeals);
         } catch (err: any) {
-            console.error('Failed to fetch appeals:', err);
-            setError(err.message || 'Failed to fetch appeals.');
+            setError('We could not load the faculty appeals at this time. Please refresh the page to try again.');
         } finally {
             setIsLoading(false);
         }
@@ -45,7 +44,7 @@ const SuperAdminDashboard: React.FC = () => {
 
     const handleAppeal = async (appealId: string, userId: string, status: 'approved' | 'rejected') => {
         if (!userId) {
-            setError('Cannot process appeal: User ID is missing.');
+            setError('This appeal could not be processed because the user account was not found. Please contact support.');
             return;
         }
         if (processingStatus[appealId]) return;
@@ -55,15 +54,12 @@ const SuperAdminDashboard: React.FC = () => {
 
         try {
             await appealService.updateAppealStatus(appealId, userId, status);
-            // Optimistically update local state
             setAllAppeals(prev =>
                 prev.map(a => a.id === appealId ? { ...a, status } : a)
             );
-            // Switch to the corresponding history tab after action
             setActiveTab(status);
         } catch (err: any) {
-            console.error('Failed to update appeal:', err);
-            setError(err.message || 'Failed to update appeal. Please try again.');
+            setError('Something went wrong while processing this appeal. Please try again.');
         } finally {
             setProcessingStatus(prev => ({ ...prev, [appealId]: undefined }));
         }
@@ -94,7 +90,6 @@ const SuperAdminDashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* Tabs */}
             <div className="flex space-x-2 mb-4 p-1 bg-slate-100 dark:bg-slate-900/50 rounded-lg w-fit">
                 <button onClick={() => setActiveTab('pending')} className={tabClasses('pending')}>
                     Pending
@@ -148,11 +143,12 @@ const SuperAdminDashboard: React.FC = () => {
                                                 {appeal.email}
                                             </p>
                                             {!appeal.userId && (
-                                                <p className="text-xs text-red-500 mt-1">Warning: User ID is missing</p>
+                                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                    This appeal is missing account information and may not be processable.
+                                                </p>
                                             )}
                                         </div>
 
-                                        {/* Only show action buttons for pending appeals */}
                                         {appeal.status === 'pending' && (
                                             <div className="flex-shrink-0 flex gap-2">
                                                 <Button

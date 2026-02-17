@@ -18,30 +18,29 @@ const FacultyAppealPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
-      setError('You must be logged in to submit an appeal.');
+      setError('You must be logged in to submit an appeal. Please sign in and try again.');
       return;
     }
 
     if (!file) {
-      setError('Please upload a verification document.');
+      setError('Please upload a verification document before submitting.');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB.');
+      setError('The selected file is too large. Please upload a file smaller than 5MB.');
       return;
     }
 
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      setError('Only JPG, PNG, and PDF files are allowed.');
+      setError('The selected file type is not supported. Please upload a JPG, PNG, or PDF file.');
       return;
     }
 
@@ -49,16 +48,14 @@ const FacultyAppealPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Upload file to Firebase Storage
       const storage = getStorage();
       const fileExtension = file.name.split('.').pop();
       const fileName = `faculty-appeals/${user.id}/${Date.now()}.${fileExtension}`;
       const storageRef = ref(storage, fileName);
-      
+
       await uploadBytes(storageRef, file);
       const fileUrl = await getDownloadURL(storageRef);
 
-      // Create appeal document in Firestore
       const appealRef = doc(db, 'faculty_appeals', user.id);
       await setDoc(appealRef, {
         userId: user.id,
@@ -73,10 +70,8 @@ const FacultyAppealPage: React.FC = () => {
         createdAt: serverTimestamp(),
       });
 
-      // Update user role to pending-faculty
       await updateProfile({ role: 'pending-faculty' });
 
-      // Notify super admins
       const superAdminIds = await notificationService.getSuperAdmins();
       await Promise.all(
         superAdminIds.map(adminId =>
@@ -89,11 +84,9 @@ const FacultyAppealPage: React.FC = () => {
         )
       );
 
-      alert('Your faculty appeal has been submitted successfully!');
-      navigate('/');
+      setIsSubmitted(true);
     } catch (err: any) {
-      console.error('Error submitting appeal:', err);
-      setError(err.message || 'An error occurred while submitting the appeal.');
+      setError('Something went wrong while submitting your appeal. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -102,23 +95,19 @@ const FacultyAppealPage: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files ? e.target.files[0] : null;
     if (selectedFile) {
-      // Validate file size immediately
       if (selectedFile.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB.');
+        setError('The selected file is too large. Please upload a file smaller than 5MB.');
         setFile(null);
         e.target.value = '';
         return;
       }
-
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError('Only JPG, PNG, and PDF files are allowed.');
+        setError('The selected file type is not supported. Please upload a JPG, PNG, or PDF file.');
         setFile(null);
         e.target.value = '';
         return;
       }
-
       setError('');
       setFile(selectedFile);
     }
@@ -128,7 +117,37 @@ const FacultyAppealPage: React.FC = () => {
     return (
       <div className="container mx-auto p-6">
         <Card className="max-w-lg mx-auto">
-          <p className="text-center text-red-500">You must be logged in to submit an appeal.</p>
+          <p className="text-center text-slate-600 dark:text-slate-400">
+            Please sign in to submit a faculty appeal.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="max-w-lg mx-auto">
+          <div className="flex flex-col items-center text-center py-4">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold dark:text-white mb-2">Appeal Submitted Successfully</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              Your faculty appeal has been received. A super administrator will review your request and get back to you soon.
+            </p>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3 mb-6 w-full">
+              <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                ⏳ Status: Awaiting Approval
+              </p>
+            </div>
+            <Button onClick={() => navigate('/')} className="w-full">
+              Return to Dashboard
+            </Button>
+          </div>
         </Card>
       </div>
     );
@@ -161,10 +180,7 @@ const FacultyAppealPage: React.FC = () => {
             required
           />
           <div>
-            <label 
-              htmlFor="file" 
-              className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-            >
+            <label htmlFor="file" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Upload ID or Verification Document <span className="text-red-500">*</span>
             </label>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
@@ -177,13 +193,13 @@ const FacultyAppealPage: React.FC = () => {
               onChange={handleFileChange}
               required
               className="mt-1 block w-full text-sm text-slate-500 dark:text-slate-400
-                file:mr-4 file:py-2 file:px-4 
-                file:rounded-lg file:border-0 
-                file:text-sm file:font-semibold 
-                file:bg-ccad-red file:text-white 
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-lg file:border-0
+                file:text-sm file:font-semibold
+                file:bg-ccad-red file:text-white
                 hover:file:bg-ccad-red-dark
                 cursor-pointer
-                border border-slate-300 dark:border-slate-600 
+                border border-slate-300 dark:border-slate-600
                 rounded-lg
                 dark:bg-slate-700"
             />
