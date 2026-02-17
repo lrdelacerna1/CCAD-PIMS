@@ -1,4 +1,3 @@
-
 import {
     collection,
     getDocs,
@@ -23,7 +22,6 @@ interface User {
 
 const equipmentRequestsCollection = collection(db, "equipmentRequests");
 const usersCollection = collection(db, "users");
-const inventoryCollection = collection(db, "inventory");
 
 export const EquipmentRequestService = {
 
@@ -92,7 +90,7 @@ export const EquipmentRequestService = {
         const createdData = newDocSnap.data();
 
         if (initialStatus === 'Pending Endorsement' && data.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("email", "==", data.endorserEmail));
+            const endorserQuery = query(usersCollection, where("emailAddress", "==", data.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
                 const endorserId = endorserSnapshot.docs[0].id;
@@ -148,7 +146,7 @@ export const EquipmentRequestService = {
         }
 
         if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval' && request.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
+            const endorserQuery = query(usersCollection, where("emailAddress", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
                 const endorserId = endorserSnapshot.docs[0].id;
@@ -161,7 +159,7 @@ export const EquipmentRequestService = {
                 });
             }
         } else if (request.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("email", "==", request.endorserEmail));
+            const endorserQuery = query(usersCollection, where("emailAddress", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
                 const endorserId = endorserSnapshot.docs[0].id;
@@ -195,7 +193,7 @@ export const EquipmentRequestService = {
         await batch.commit();
 
         for (const req of requestsToNotify) {
-            if (status === 'Returned')  {
+            if (status === 'Returned') {
                 await NotificationService.createNotification({
                     userId: req.userId,
                     title: "Request Completed",
@@ -214,7 +212,7 @@ export const EquipmentRequestService = {
             }
 
             if (req.status === 'Pending Endorsement' && status === 'Pending Approval' && req.endorserEmail) {
-                const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
+                const endorserQuery = query(usersCollection, where("emailAddress", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
                 if (!endorserSnapshot.empty) {
                     const endorserId = endorserSnapshot.docs[0].id;
@@ -227,7 +225,7 @@ export const EquipmentRequestService = {
                     });
                 }
             } else if (req.endorserEmail) {
-                const endorserQuery = query(usersCollection, where("email", "==", req.endorserEmail));
+                const endorserQuery = query(usersCollection, where("emailAddress", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
                 if (!endorserSnapshot.empty) {
                     const endorserId = endorserSnapshot.docs[0].id;
