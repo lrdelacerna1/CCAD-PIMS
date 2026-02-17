@@ -194,7 +194,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                         <ul className="list-decimal list-inside space-y-3 pl-2">
                             <li><span className="font-semibold">Browse the Catalog:</span> Go to the 'Catalog' page to see all available equipment and rooms. You can search and filter by campus area.</li>
                             <li><span className="font-semibold">Select Your Dates:</span> In the cart sidebar on the right, choose the start and end dates for your reservation. The catalog will automatically show what's available for that period.</li>
-                            <li><span className="font-semibold">Add to Cart:</span> Click 'Add to Cart' for any item you need. For equipment, you can add multiple types and adjust quantities in the cart. For rooms, you can only reserve one at a time.</li>
+                            <li><span className="font-semibold">Add to Cart:</span> Click 'Add to Cart' for any item you need. You can add multiple types and adjust quantities in the cart for rooms and equipments. </li>
                             <li><span className="font-semibold">Finalize & Submit:</span> Once your cart is ready, click 'Finalize Request'. A form will appear where you'll provide details like the purpose of your request and an endorser. After submitting, your request is sent for approval.</li>
                         </ul>
 
