@@ -1,4 +1,3 @@
-
 import {
     collection,
     getDocs,
@@ -29,10 +28,51 @@ interface RoomTypeForCatalog extends RoomTypeWithQuantity {
     availableForDates: number;
 }
 
-
 const roomTypesCollection = collection(db, "roomTypes");
 const roomInstancesCollection = collection(db, "roomInstances");
 const roomRequestsCollection = collection(db, "roomRequests");
+
+// Statuses that block a room instance from being reserved.
+// Includes pending states so instances are blocked even before admin approval.
+const BLOCKING_STATUSES = [
+    'Pending Endorsement',
+    'Pending Approval',
+    'Approved',
+    'Ready for Check-in',
+    'In Use',
+    'Overdue',
+];
+
+function getDatesInRange(startDate: string, endDate: string): string[] {
+    const dates: string[] = [];
+    let current = new Date(startDate);
+    const last = new Date(endDate);
+    while (current <= last) {
+        dates.push(current.toISOString().split('T')[0]);
+        current.setDate(current.getDate() + 1);
+    }
+    return dates;
+}
+
+function overlaps(resStart: string, resEnd: string, startDate: string, endDate: string): boolean {
+    return resStart <= endDate && resEnd >= startDate;
+}
+
+/**
+ * Extracts all booked instance IDs from a room request document.
+ * Room requests store instance IDs inside the `requestedRoom` array,
+ * NOT at the root level — this was the source of the availability bug.
+ */
+function getBookedInstanceIdsFromRoomRequest(res: any): string[] {
+    const ids: string[] = [];
+    // requestedRoom is the array of { roomTypeId, areaId, instanceId, name }
+    if (Array.isArray(res.requestedRoom)) {
+        for (const room of res.requestedRoom) {
+            if (room.instanceId) ids.push(room.instanceId);
+        }
+    }
+    return ids;
+}
 
 export const RoomService = {
 
@@ -47,109 +87,76 @@ export const RoomService = {
 
         const instancesByRoomTypeId = instances.docs.reduce((acc, instDoc) => {
             const inst = instDoc.data();
-            const roomTypeId = inst.roomTypeId;
-            if (!acc[roomTypeId]) {
-                acc[roomTypeId] = [];
-            }
-            acc[roomTypeId].push({ id: instDoc.id, ...inst });
+            if (!acc[inst.roomTypeId]) acc[inst.roomTypeId] = [];
+            acc[inst.roomTypeId].push({ id: instDoc.id, ...inst });
             return acc;
         }, {} as Record<string, any[]>);
 
-        const typesWithQuantities: RoomTypeWithQuantity[] = types.docs.map(typeDoc => {
+        return types.docs.map(typeDoc => {
             const typeData = typeDoc.data();
             const roomInstances = instancesByRoomTypeId[typeDoc.id] || [];
             const quantity = {
                 total: roomInstances.length,
-                available: roomInstances.filter(i => i.status === 'Available').length,
-                reserved: roomInstances.filter(i => i.status === 'Reserved').length,
-                underMaintenance: roomInstances.filter(i => i.status === 'Under Maintenance').length,
+                available: roomInstances.filter((i: any) => i.status === 'Available').length,
+                reserved: roomInstances.filter((i: any) => i.status === 'Reserved').length,
+                underMaintenance: roomInstances.filter((i: any) => i.status === 'Under Maintenance').length,
             };
             return { id: typeDoc.id, ...typeData, quantity } as RoomTypeWithQuantity;
         });
-
-        return typesWithQuantities;
     },
 
     async getRoomTypesForCatalog(startDate: string, endDate: string): Promise<RoomTypeForCatalog[]> {
         const baseRoomTypes = (await this.getRoomTypes()).filter(rt => !rt.isHidden);
+        if (baseRoomTypes.length === 0) return [];
 
-        const datesInRange: string[] = [];
-        if (startDate && endDate) {
-            let currentDate = new Date(startDate);
-            const lastDate = new Date(endDate);
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
+        const datesInRange = getDatesInRange(startDate, endDate);
 
         const allInstancesSnapshot = await getDocs(query(roomInstancesCollection));
-        const allInstances = allInstancesSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-        
-        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
-        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue'];
+        const allInstances = allInstancesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
         const allReservationsSnapshot = await getDocs(query(
             roomRequestsCollection,
-            where('status', 'in', blockingStatuses),
+            where('status', 'in', BLOCKING_STATUSES),
         ));
-        
-        const allReservations = allReservationsSnapshot.docs.map(d => ({id: d.id, ...d.data()}))
+
+        // Only keep reservations that overlap the requested date range
+        const overlappingReservations = allReservationsSnapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
             .filter((res: any) => {
-                const reqStart = res.requestedStartDate.split('T')[0];
-                const reqEnd = res.requestedEndDate.split('T')[0];
-                return reqStart <= endDate && reqEnd >= startDate;
+                const reqStart = (res.requestedStartDate as string).split('T')[0];
+                const reqEnd = (res.requestedEndDate as string).split('T')[0];
+                return overlaps(reqStart, reqEnd, startDate, endDate);
             });
 
-        const catalogItems: RoomTypeForCatalog[] = [];
-        
-        for (const roomType of baseRoomTypes) {
-            const instancesOfThisType = allInstances.filter((inst: any) => inst.roomTypeId === roomType.id);
+        // Build a set of all instance IDs that are booked in this date range
+        // FIX: Read from requestedRoom[].instanceId, not res.instanceId
+        const reservedInstanceIds = new Set<string>();
+        overlappingReservations.forEach((res: any) => {
+            getBookedInstanceIdsFromRoomRequest(res).forEach(id => reservedInstanceIds.add(id));
+        });
+
+        return baseRoomTypes.map(roomType => {
+            const instancesOfThisType = allInstances.filter((inst: any) => inst.roomTypeId === roomType.id) as RoomInstance[];
             let availableCount = 0;
 
             if (datesInRange.length > 0) {
-                 for (const instance of instancesOfThisType) {
-                     const inst = instance as RoomInstance;
-                     if (inst.status === 'Under Maintenance') continue;
-                     if (inst.blockedDates && inst.blockedDates.some(d => datesInRange.includes(d))) continue;
-
-                     const isBooked = allReservations.some((req: any) => {
-                         if (req.instanceId !== inst.id) return false;
-                         const reqStart = req.requestedStartDate.split('T')[0];
-                         const reqEnd = req.requestedEndDate.split('T')[0];
-                         return reqStart <= endDate && reqEnd >= startDate;
-                     });
-                     
-                     if (!isBooked) {
-                         availableCount++;
-                     }
-                 }
-                 
-                 const unassignedReservations = allReservations.filter((req: any) => 
-                    !req.instanceId && 
-                    req.roomTypeId === roomType.id &&
-                    (req.requestedStartDate.split('T')[0] <= endDate && req.requestedEndDate.split('T')[0] >= startDate)
-                 ).length;
-                 
-                 availableCount = Math.max(0, availableCount - unassignedReservations);
-
+                for (const inst of instancesOfThisType) {
+                    if (inst.status === 'Under Maintenance') continue;
+                    if ((inst.blockedDates || []).some(d => datesInRange.includes(d))) continue;
+                    if (reservedInstanceIds.has(inst.id)) continue;
+                    availableCount++;
+                }
             } else {
                 availableCount = roomType.quantity.available;
             }
 
             let availabilityStatus = 'Unavailable';
-            if (roomType.quantity.total === 0) {
-                availabilityStatus = 'Unavailable';
-            } else if (availableCount > 0) {
+            if (roomType.quantity.total > 0 && availableCount > 0) {
                 availabilityStatus = 'Available';
-            } else {
-                availabilityStatus = 'Unavailable';
             }
 
-            catalogItems.push({ ...roomType, availabilityStatus, availableForDates: availableCount });
-        }
-
-        return catalogItems;
+            return { ...roomType, availabilityStatus, availableForDates: availableCount };
+        });
     },
 
     async createRoomType(data: { name: string; areaId: string; photoUrl?: string }): Promise<RoomType> {
@@ -158,10 +165,7 @@ export const RoomService = {
         if (!querySnapshot.empty) {
             throw new Error(`A room type with the name "${data.name}" already exists in this area.`);
         }
-        const newRoomTypeData = {
-            ...data,
-            isHidden: false,
-        };
+        const newRoomTypeData = { ...data, isHidden: false };
         const docRef = await addDoc(roomTypesCollection, newRoomTypeData);
         return { id: docRef.id, ...newRoomTypeData } as RoomType;
     },
@@ -169,20 +173,17 @@ export const RoomService = {
     async updateRoomType(id: string, updates: { name: string; areaId: string; isHidden?: boolean; photoUrl?: string }): Promise<RoomType> {
         const typeRef = doc(db, "roomTypes", id);
         const typeSnap = await getDoc(typeRef);
-        if (!typeSnap.exists()) {
-            throw new Error('Room type not found.');
-        }
+        if (!typeSnap.exists()) throw new Error('Room type not found.');
 
         if (updates.name && updates.name !== typeSnap.data().name) {
-             const q = query(roomTypesCollection, where("name", "==", updates.name), where("areaId", "==", updates.areaId));
-             const collisionSnapshot = await getDocs(q);
-             if (!collisionSnapshot.empty && collisionSnapshot.docs[0].id !== id) {
-                 throw new Error(`A room type with the name "${updates.name}" already exists in this area.`);
-             }
+            const q = query(roomTypesCollection, where("name", "==", updates.name), where("areaId", "==", updates.areaId));
+            const collisionSnapshot = await getDocs(q);
+            if (!collisionSnapshot.empty && collisionSnapshot.docs[0].id !== id) {
+                throw new Error(`A room type with the name "${updates.name}" already exists in this area.`);
+            }
         }
 
         await updateDoc(typeRef, updates as any);
-
         const updatedDoc = await getDoc(typeRef);
         return { id: updatedDoc.id, ...updatedDoc.data() } as RoomType;
     },
@@ -191,13 +192,9 @@ export const RoomService = {
         const batch = writeBatch(db);
         const typeRef = doc(db, "roomTypes", id);
         batch.delete(typeRef);
-
         const instancesQuery = query(roomInstancesCollection, where("roomTypeId", "==", id));
         const instancesSnapshot = await getDocs(instancesQuery);
-        instancesSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
+        instancesSnapshot.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
     },
 
@@ -220,38 +217,35 @@ export const RoomService = {
     },
 
     async deleteRoomInstance(id: string): Promise<void> {
-        const instanceRef = doc(db, "roomInstances", id);
-        await deleteDoc(instanceRef);
+        await deleteDoc(doc(db, "roomInstances", id));
     },
 
     async checkRoomAvailability(request: RoomAvailabilityRequest): Promise<RoomInstanceAvailabilityResult[]> {
         const { startDate, endDate, roomTypeIds } = request;
         const results: RoomInstanceAvailabilityResult[] = [];
 
-        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
-        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Check-in', 'In Use', 'Overdue'];
-
         const reservationsSnapshot = await getDocs(query(
             roomRequestsCollection,
-            where('status', 'in', blockingStatuses)
+            where('status', 'in', BLOCKING_STATUSES)
         ));
-        const allReservations = reservationsSnapshot.docs
+
+        // Only keep reservations that overlap the requested date range
+        const overlappingReservations = reservationsSnapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))
-            .filter(res => {
-                const reqStart = res.requestedStartDate.split('T')[0];
-                const reqEnd = res.requestedEndDate.split('T')[0];
-                return reqStart <= endDate && reqEnd >= startDate;
+            .filter((res: any) => {
+                const reqStart = (res.requestedStartDate as string).split('T')[0];
+                const reqEnd = (res.requestedEndDate as string).split('T')[0];
+                return overlaps(reqStart, reqEnd, startDate, endDate);
             });
 
-        const datesInRange: string[] = [];
-        if (startDate && endDate) {
-            let currentDate = new Date(startDate);
-            const lastDate = new Date(endDate);
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
+        // Build a set of all instance IDs that are booked in this date range
+        // FIX: Read from requestedRoom[].instanceId, not res.instanceId
+        const reservedInstanceIds = new Set<string>();
+        overlappingReservations.forEach((res: any) => {
+            getBookedInstanceIdsFromRoomRequest(res).forEach(id => reservedInstanceIds.add(id));
+        });
+
+        const datesInRange = getDatesInRange(startDate, endDate);
 
         for (const roomTypeId of roomTypeIds) {
             const typeSnap = await getDoc(doc(db, "roomTypes", roomTypeId));
@@ -263,50 +257,20 @@ export const RoomService = {
             const availableInstancesResult: { id: string, name: string, condition: RoomCondition }[] = [];
             const unavailableInstancesResult: { id: string, name: string, status: RoomStatus }[] = [];
 
-            const potentiallyAvailable: RoomInstance[] = [];
             for (const inst of allInstancesOfRoomType) {
                 const isBlocked = (inst.blockedDates || []).some(d => datesInRange.includes(d.split('T')[0]));
+
                 if (inst.status === 'Under Maintenance' || isBlocked) {
                     unavailableInstancesResult.push({ id: inst.id, name: inst.name, status: 'Under Maintenance' });
-                } else {
-                    potentiallyAvailable.push(inst);
-                }
-            }
-
-            const unassignedInstances: RoomInstance[] = [];
-            for (const inst of potentiallyAvailable) {
-                const isAssigned = allReservations.some(req => req.instanceId === inst.id);
-                if (isAssigned) {
+                } else if (reservedInstanceIds.has(inst.id)) {
+                    // FIX: This now correctly fires because reservedInstanceIds is
+                    // populated from requestedRoom[].instanceId instead of res.instanceId
                     unavailableInstancesResult.push({ id: inst.id, name: inst.name, status: 'Reserved' });
                 } else {
-                    unassignedInstances.push(inst);
-                }
-            }
-            
-            let maxConcurrentFloatingReservations = 0;
-            if (datesInRange.length > 0) {
-                for (const date of datesInRange) {
-                    const reservationsOnDate = allReservations.filter(res => 
-                        !res.instanceId &&
-                        res.roomTypeId === roomTypeId &&
-                        res.requestedStartDate.split('T')[0] <= date && 
-                        res.requestedEndDate.split('T')[0] >= date
-                    );
-                    if (reservationsOnDate.length > maxConcurrentFloatingReservations) {
-                        maxConcurrentFloatingReservations = reservationsOnDate.length;
-                    }
+                    availableInstancesResult.push({ id: inst.id, name: inst.name, condition: inst.condition });
                 }
             }
 
-            const instancesToMarkAsReserved = unassignedInstances.splice(0, maxConcurrentFloatingReservations);
-            for (const inst of instancesToMarkAsReserved) {
-                unavailableInstancesResult.push({ id: inst.id, name: inst.name, status: 'Reserved' });
-            }
-
-            for (const inst of unassignedInstances) {
-                availableInstancesResult.push({ id: inst.id, name: inst.name, condition: inst.condition });
-            }
-            
             results.push({
                 roomTypeId,
                 totalInstances: allInstancesOfRoomType.length,

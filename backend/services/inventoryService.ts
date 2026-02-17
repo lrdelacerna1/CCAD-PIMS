@@ -37,13 +37,39 @@ interface AvailabilityRequest {
 interface InstanceAvailabilityResult {
     itemId: string;
     itemName: string;
-    availableInstances: InventoryInstance[]; // Return full instance objects
+    availableInstances: InventoryInstance[];
     unavailableInstances: { id: string, assetTag: string, status: InventoryInstanceStatus }[];
 }
 
 const inventoryItemsCollection = collection(db, "inventoryItems");
 const inventoryInstancesCollection = collection(db, "inventoryInstances");
 const equipmentRequestsCollection = collection(db, "equipmentRequests");
+
+// Statuses that block an instance from being reserved.
+// Includes pending states so instances are blocked even before admin approval.
+const BLOCKING_STATUSES = [
+    'Pending Endorsement',
+    'Pending Approval',
+    'Approved',
+    'Ready for Pickup',
+    'In Use',
+    'Overdue',
+];
+
+function getDatesInRange(startDate: string, endDate: string): string[] {
+    const dates: string[] = [];
+    let current = new Date(startDate);
+    const last = new Date(endDate);
+    while (current <= last) {
+        dates.push(current.toISOString().split('T')[0]);
+        current.setDate(current.getDate() + 1);
+    }
+    return dates;
+}
+
+function overlaps(resStart: string, resEnd: string, startDate: string, endDate: string): boolean {
+    return resStart <= endDate && resEnd >= startDate;
+}
 
 export const InventoryService = {
 
@@ -60,16 +86,14 @@ export const InventoryService = {
         const instances = instancesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
         const instancesByItemId = instances.reduce((acc, inst: any) => {
-            const itemId = inst.itemId;
-            if (!acc[itemId]) acc[itemId] = [];
-            acc[itemId].push(inst);
+            if (!acc[inst.itemId]) acc[inst.itemId] = [];
+            acc[inst.itemId].push(inst);
             return acc;
         }, {} as Record<string, any[]>);
 
-        const itemsWithQuantities: InventoryItemWithQuantity[] = items.map((item: any) => {
+        return items.map((item: any) => {
             const allInstances = instancesByItemId[item.id] || [];
             const usableInstances = allInstances.filter((i: any) => i.condition !== 'Lost/Unusable');
-            
             const quantity = {
                 total: allInstances.length,
                 available: usableInstances.filter((i: any) => i.status === 'Available').length,
@@ -78,8 +102,6 @@ export const InventoryService = {
             };
             return { ...item, quantity } as InventoryItemWithQuantity;
         });
-
-        return itemsWithQuantities;
     },
 
     async getInventoryForCatalog(startDate: string, endDate: string): Promise<InventoryItemForCatalog[]> {
@@ -95,50 +117,37 @@ export const InventoryService = {
             return acc;
         }, {} as Record<string, any[]>);
 
-        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
-        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'];
-        
-        const reservationsSnapshot = await getDocs(query(equipmentRequestsCollection,
-            where('status', 'in', blockingStatuses)
+        const reservationsSnapshot = await getDocs(query(
+            equipmentRequestsCollection,
+            where('status', 'in', BLOCKING_STATUSES)
         ));
-        
-        const overlappingReservations = reservationsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-            .filter((res: any) => {
-                const reqStart = res.requestedStartDate.split('T')[0];
-                const reqEnd = res.requestedEndDate.split('T')[0];
-                return reqStart <= endDate && reqEnd >= startDate;
-            });
 
+        // Collect all reserved instance IDs that overlap the requested date range
         const reservedInstanceIds = new Set<string>();
-        overlappingReservations.forEach((res: any) => {
-            (res.requestedItems || []).forEach((item: any) => {
-                if (item.instanceId) {
-                    reservedInstanceIds.add(item.instanceId);
-                }
-            });
+        reservationsSnapshot.docs.forEach(d => {
+            const res = d.data();
+            const reqStart = (res.requestedStartDate as string).split('T')[0];
+            const reqEnd = (res.requestedEndDate as string).split('T')[0];
+            if (overlaps(reqStart, reqEnd, startDate, endDate)) {
+                (res.requestedItems || []).forEach((item: any) => {
+                    if (item.instanceId) reservedInstanceIds.add(item.instanceId);
+                });
+            }
         });
 
-        const datesInRange: string[] = [];
-        if (startDate && endDate) {
-            let currentDate = new Date(startDate);
-            const lastDate = new Date(endDate);
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
+        const datesInRange = getDatesInRange(startDate, endDate);
 
-        const catalogItems: InventoryItemForCatalog[] = baseInventory.map(item => {
+        return baseInventory.map(item => {
             const itemInstances = (instancesByItemId[item.id] || []) as InventoryInstance[];
-            
+
             let availableForDates = 0;
             if (datesInRange.length > 0) {
-                const potentiallyAvailableInstances = itemInstances.filter(inst => 
+                const potentiallyAvailable = itemInstances.filter(inst =>
                     inst.condition !== 'Lost/Unusable' &&
                     inst.status !== 'Under Maintenance' &&
                     !(inst.blockedDates || []).some(d => datesInRange.includes(d))
                 );
-                availableForDates = potentiallyAvailableInstances.filter(inst => !reservedInstanceIds.has(inst.id)).length;
+                availableForDates = potentiallyAvailable.filter(inst => !reservedInstanceIds.has(inst.id)).length;
             } else {
                 availableForDates = item.quantity.available;
             }
@@ -146,15 +155,12 @@ export const InventoryService = {
             const availabilityStatus: AvailabilityStatus = availableForDates > 0 ? 'Available' : 'Unavailable';
 
             const conditionSummary = itemInstances.reduce((acc, instance) => {
-                const condition = instance.condition;
-                acc[condition] = (acc[condition] || 0) + 1;
+                acc[instance.condition] = (acc[instance.condition] || 0) + 1;
                 return acc;
             }, {} as Partial<Record<InventoryInstanceCondition, number>>);
 
             return { ...item, availableForDates, availabilityStatus, conditionSummary };
         });
-        
-        return catalogItems;
     },
 
     async createItem(itemData: { name: string; areaId: string; photoUrl?: string }): Promise<InventoryItem> {
@@ -180,7 +186,7 @@ export const InventoryService = {
                 throw new Error(`An item with the name "${updates.name}" already exists in this area.`);
             }
         }
-        
+
         await updateDoc(itemRef, updates as any);
         const updatedDoc = await getDoc(itemRef);
         return { id: updatedDoc.id, ...updatedDoc.data() } as InventoryItem;
@@ -216,42 +222,30 @@ export const InventoryService = {
     async deleteInstance(id: string): Promise<void> {
         await deleteDoc(doc(db, "inventoryInstances", id));
     },
-    
+
     async checkAvailability(request: AvailabilityRequest): Promise<InstanceAvailabilityResult[]> {
         const { startDate, endDate, itemIds } = request;
         const results: InstanceAvailabilityResult[] = [];
 
-        // Blocking statuses now include 'Pending Endorsement' and 'Pending Approval'
-        const blockingStatuses = ['Pending Endorsement', 'Pending Approval', 'Pending Confirmation', 'For Approval', 'Approved', 'Ready for Pickup', 'In Use', 'Overdue'];
-
-        const reservationsSnapshot = await getDocs(query(equipmentRequestsCollection,
-            where('status', 'in', blockingStatuses)
+        const reservationsSnapshot = await getDocs(query(
+            equipmentRequestsCollection,
+            where('status', 'in', BLOCKING_STATUSES)
         ));
-        const overlappingReservations = reservationsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-            .filter((res: any) => {
-                const reqStart = res.requestedStartDate.split('T')[0];
-                const reqEnd = res.requestedEndDate.split('T')[0];
-                return reqStart <= endDate && reqEnd >= startDate;
-            });
-        
+
+        // Collect all reserved instance IDs that overlap the requested date range
         const reservedInstanceIds = new Set<string>();
-        overlappingReservations.forEach((res: any) => {
-            (res.requestedItems || []).forEach((item: any) => {
-                if (item.instanceId) {
-                    reservedInstanceIds.add(item.instanceId);
-                }
-            });
+        reservationsSnapshot.docs.forEach(d => {
+            const res = d.data();
+            const reqStart = (res.requestedStartDate as string).split('T')[0];
+            const reqEnd = (res.requestedEndDate as string).split('T')[0];
+            if (overlaps(reqStart, reqEnd, startDate, endDate)) {
+                (res.requestedItems || []).forEach((item: any) => {
+                    if (item.instanceId) reservedInstanceIds.add(item.instanceId);
+                });
+            }
         });
 
-        const datesInRange: string[] = [];
-        if (startDate && endDate) {
-            let currentDate = new Date(startDate);
-            const lastDate = new Date(endDate);
-            while (currentDate <= lastDate) {
-                datesInRange.push(currentDate.toISOString().split('T')[0]);
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
+        const datesInRange = getDatesInRange(startDate, endDate);
 
         for (const itemId of itemIds) {
             const itemSnap = await getDoc(doc(db, "inventoryItems", itemId));
@@ -263,18 +257,17 @@ export const InventoryService = {
 
             const availableInstancesResult: InventoryInstance[] = [];
             const unavailableInstancesResult: { id: string, assetTag: string, status: InventoryInstanceStatus }[] = [];
-            
-            for (const inst of allInstancesOfItem) {
-                const isBlocked = (inst.blockedDates || []).some(d => datesInRange.includes(d.split('T')[0]));
 
+            for (const inst of allInstancesOfItem) {
                 if (inst.condition === 'Lost/Unusable') continue;
+
+                const isBlocked = (inst.blockedDates || []).some(d => datesInRange.includes(d.split('T')[0]));
 
                 if (inst.status === 'Under Maintenance' || isBlocked) {
                     unavailableInstancesResult.push({ id: inst.id, assetTag: inst.assetTag, status: 'Under Maintenance' });
                 } else if (reservedInstanceIds.has(inst.id)) {
                     unavailableInstancesResult.push({ id: inst.id, assetTag: inst.assetTag, status: 'Reserved' });
                 } else {
-                    // FIX: Push full instance object to allow frontend to access 'name' if available
                     availableInstancesResult.push(inst);
                 }
             }
@@ -286,6 +279,7 @@ export const InventoryService = {
                 unavailableInstances: unavailableInstancesResult
             });
         }
+
         return results;
     }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotification } from '../contexts/NotificationContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { BellIcon } from '../Icons';
 import { formatDistanceToNow } from 'date-fns';
 import { Notification } from '../../types';

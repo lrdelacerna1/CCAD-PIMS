@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import EquipmentCatalog from '../components/catalog/EquipmentCatalog';
 import RoomCatalog from '../components/catalog/RoomCatalog';
@@ -35,8 +35,7 @@ const CatalogPage: React.FC = () => {
 
     const [startDate, setStartDate] = useState(minDate);
     const [endDate, setEndDate] = useState(minDate);
-    
-    // Time states
+
     const [startTime, setStartTime] = useState('08:00');
     const [endTime, setEndTime] = useState('17:00');
     const [isWholeDay, setIsWholeDay] = useState(false);
@@ -72,20 +71,18 @@ const CatalogPage: React.FC = () => {
         fetchStaticData();
     }, []);
 
-    useEffect(() => {
-    const fetchCatalogData = async () => {
+    // Extracted as useCallback so handleSuccessRequest can call it directly
+    const fetchCatalogData = useCallback(async () => {
         if (new Date(endDate) < new Date(startDate)) {
             setEquipmentInventory([]);
             setRoomInventory([]);
             setError("End date cannot be before start date.");
             return;
         }
-        
+
         setIsLoading(true);
         setError('');
         try {
-            // NOTE: Ideally, the catalog API should accept time parameters to filter availability more precisely.
-            // Currently, it filters by date range only.
             if (activeTab === 'equipment') {
                 const inventoryData = await getInventoryCatalogApi(startDate, endDate);
                 setEquipmentInventory(inventoryData || []);
@@ -98,10 +95,11 @@ const CatalogPage: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [startDate, endDate, activeTab, startTime, endTime, isWholeDay]);
 
-    fetchCatalogData();
-}, [startDate, endDate, activeTab, startTime, endTime, isWholeDay]); // Re-fetch when time changes (even if backend doesn't fully support it yet, it prepares for it)
+    useEffect(() => {
+        fetchCatalogData();
+    }, [fetchCatalogData]);
 
     useEffect(() => {
         setEquipmentCart(new Map());
@@ -110,7 +108,8 @@ const CatalogPage: React.FC = () => {
 
     const totalItemCount = useMemo(() => {
         if (activeTab === 'equipment') {
-            return (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]).reduce((sum: number, group) => sum + group.instances.size, 0);
+            return (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[])
+                .reduce((sum: number, group) => sum + group.instances.size, 0);
         }
         return roomCart.size;
     }, [equipmentCart, roomCart, activeTab]);
@@ -121,7 +120,8 @@ const CatalogPage: React.FC = () => {
         if ('serialNumber' in instances[0]) {
             setEquipmentCart(prev => {
                 const newCart = new Map(prev);
-                const group = (newCart.get(item.id) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined) || { item: item as InventoryItemForCatalog, instances: new Map() };
+                const group = (newCart.get(item.id) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined)
+                    || { item: item as InventoryItemForCatalog, instances: new Map() };
                 (instances as InventoryInstance[]).forEach(inst => {
                     group.instances.set(inst.id, inst);
                 });
@@ -138,7 +138,7 @@ const CatalogPage: React.FC = () => {
             });
         }
     };
-    
+
     const handleRemoveFromCart = (itemId: string, instanceId?: string) => {
         if (activeTab === 'equipment') {
             setEquipmentCart(prev => {
@@ -147,9 +147,7 @@ const CatalogPage: React.FC = () => {
                     const group = newCart.get(itemId) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> } | undefined;
                     if (group) {
                         group.instances.delete(instanceId);
-                        if (group.instances.size === 0) {
-                            newCart.delete(itemId);
-                        }
+                        if (group.instances.size === 0) newCart.delete(itemId);
                     }
                 }
                 return newCart;
@@ -169,17 +167,20 @@ const CatalogPage: React.FC = () => {
             setIsMobileCartOpen(false);
         }
     };
-    
+
     const handleCloseRequestModal = () => setIsRequestModalOpen(false);
-    
+
     const handleSuccessRequest = () => {
         setIsRequestModalOpen(false);
+        // Clear the cart for the active tab
         if (activeTab === 'equipment') setEquipmentCart(new Map());
         else setRoomCart(new Map());
+        // Immediately refetch catalog so newly blocked instances/rooms show as unavailable
+        fetchCatalogData();
     };
 
     const handleViewDetailsClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => setViewingItem(item);
-    
+
     const handleSelectInstancesClick = (item: InventoryItemForCatalog | RoomTypeForCatalog) => {
         setViewingItem(null);
         setSelectingInstancesFor(item);
@@ -204,14 +205,12 @@ const CatalogPage: React.FC = () => {
                     endDate={endDate}
                     onStartDateChange={setStartDate}
                     onEndDateChange={setEndDate}
-                    // Pass time props
                     startTime={startTime}
                     endTime={endTime}
                     onStartTimeChange={setStartTime}
                     onEndTimeChange={setEndTime}
                     isWholeDay={isWholeDay}
                     onWholeDayChange={setIsWholeDay}
-                    
                     minDate={minDate}
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -223,7 +222,7 @@ const CatalogPage: React.FC = () => {
             <main className="flex-grow overflow-y-auto p-6">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold dark:text-white">Resource Catalog</h1>
-                    <button 
+                    <button
                         onClick={() => setIsMobileCartOpen(true)}
                         className="lg:hidden relative p-2 bg-up-maroon-700 text-white rounded-full shadow-lg"
                     >
@@ -296,10 +295,11 @@ const CatalogPage: React.FC = () => {
                     onClose={() => setSelectingInstancesFor(null)}
                     onConfirm={handleInstancesSelected}
                     alreadySelectedIds={new Set(
-                        activeTab === 'equipment' 
+                        activeTab === 'equipment'
                             ? (equipmentCart.get(selectingInstancesFor.id)?.instances.keys() || [])
-                            // Check if the item being selected is of the same type as what's in the cart, then get the instance ids
-                            : (Array.from(roomCart.values()).filter(cartItem => cartItem.type.id === selectingInstancesFor.id).map(cartItem => cartItem.instance.id))
+                            : Array.from(roomCart.values())
+                                .filter(cartItem => cartItem.type.id === selectingInstancesFor.id)
+                                .map(cartItem => cartItem.instance.id)
                     )}
                 />
             )}
@@ -310,15 +310,15 @@ const CatalogPage: React.FC = () => {
                         areas={areas}
                         onClose={handleCloseRequestModal}
                         onSuccess={handleSuccessRequest}
-                        items={new Map((Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[]).flatMap(group => 
-                            Array.from(group.instances.values()).map(inst => [inst.id, { item: group.item, instance: inst }])
-                        ))}
+                        items={new Map(
+                            (Array.from(equipmentCart.values()) as { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }[])
+                                .flatMap(group =>
+                                    Array.from(group.instances.values()).map(inst => [inst.id, { item: group.item, instance: inst }])
+                                )
+                        )}
                         startDate={startDate}
                         endDate={endDate}
                         minimumLeadDays={settings?.minimumLeadDays ?? 2}
-                        // Pass selected time to modal if supported
-                        // Note: NewEquipmentRequestModal currently has local state for time, 
-                        // ideally we should pass it as initial props if we want it pre-filled
                     />
                 ) : (
                     roomCart.size > 0 && (
