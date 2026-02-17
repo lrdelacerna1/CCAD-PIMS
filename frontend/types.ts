@@ -1,7 +1,7 @@
 
 // Main data types used throughout the frontend application
 
-export type UserRole = 'student' | 'admin' | 'superadmin' | 'faculty' | 'guest';
+export type UserRole = 'student' | 'faculty' | 'guest' | 'admin' | 'superadmin' | 'pending-faculty';
 
 export interface User {
     id: string;
@@ -9,11 +9,11 @@ export interface User {
     name: string;
     role: UserRole;
     photoURL?: string;
-    // Optional fields based on your user schema
     firstName?: string;
     lastName?: string;
     emailAddress?: string;
     emailVerified?: boolean;
+    managedAreaIds?: string[]; // ADD THIS
 }
 
 export interface Area {
@@ -21,6 +21,12 @@ export interface Area {
     name: string;
     description: string;
     penaltyAmount: number;
+    adminIds?: string[];      // ADD THIS
+    facultyIds?: string[];    // ADD THIS
+    penaltySettings?: {
+        penaltyAmount: number;
+        penaltyInterval: 'per_day' | 'per_hour';
+    };
 }
 
 // --- INVENTORY & EQUIPMENT --- //

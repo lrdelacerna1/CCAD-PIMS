@@ -79,14 +79,9 @@ export const EquipmentRequestService = {
             }
         }
 
-        let initialStatus: EquipmentRequestStatus;
-        if (requestingUser?.role === 'student') {
-            initialStatus = 'Pending Endorsement';
-        } else if (requestingUser?.role === 'guest') {
-            initialStatus = data.endorserEmail ? 'Pending Endorsement' : 'Pending Approval';
-        } else {
-            initialStatus = 'Pending Approval';
-        }
+        const userRole = requestingUser?.role;
+        const needsEndorsement = (userRole === 'student') || (userRole === 'guest' && !!data.endorserEmail);
+        const initialStatus: EquipmentRequestStatus = needsEndorsement ? 'Pending Endorsement' : 'Pending Confirmation';
 
         const newRequestData = {
             ...data,
