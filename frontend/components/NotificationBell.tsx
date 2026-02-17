@@ -1,13 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../contexts/NotificationContext';
 import { BellIcon } from './Icons';
-;
 import { formatDistanceToNow } from 'date-fns';
+import { Notification } from '../types';
+
+type NotifFilter = 'all' | 'equipment' | 'room';
+
+const FILTER_KEYWORDS: Record<Exclude<NotifFilter, 'all'>, string[]> = {
+    equipment: ['equipment', 'item', 'pickup', 'returned'],
+    room: ['room', 'check-in', 'check-out'],
+};
+
+function categorize(n: Notification): 'equipment' | 'room' | 'other' {
+    const text = `${n.title} ${n.message}`.toLowerCase();
+    if (FILTER_KEYWORDS.equipment.some(k => text.includes(k))) return 'equipment';
+    if (FILTER_KEYWORDS.room.some(k => text.includes(k))) return 'room';
+    return 'other';
+}
 
 const NotificationBell: React.FC = () => {
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
     const [isOpen, setIsOpen] = useState(false);
+    const [filter, setFilter] = useState<NotifFilter>('all');
     const navigate = useNavigate();
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +47,26 @@ const NotificationBell: React.FC = () => {
         markAllAsRead();
     };
 
+    const filteredNotifications = useMemo(() => {
+        if (filter === 'all') return notifications;
+        return notifications.filter(n => categorize(n) === filter);
+    }, [notifications, filter]);
+
+    const equipmentUnread = useMemo(() =>
+        notifications.filter(n => !n.isRead && categorize(n) === 'equipment').length,
+        [notifications]
+    );
+    const roomUnread = useMemo(() =>
+        notifications.filter(n => !n.isRead && categorize(n) === 'room').length,
+        [notifications]
+    );
+
+    const filterTabs: { key: NotifFilter; label: string; count: number }[] = [
+        { key: 'all', label: 'All', count: unreadCount },
+        { key: 'equipment', label: 'Equipment', count: equipmentUnread },
+        { key: 'room', label: 'Room', count: roomUnread },
+    ];
+
     return (
         <div className="relative" ref={dropdownRef}>
             {/* Bell Button */}
@@ -51,7 +86,7 @@ const NotificationBell: React.FC = () => {
             {/* Dropdown */}
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-slate-800 rounded-xl shadow-xl z-50 border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    
+
                     {/* Header */}
                     <div className="px-4 py-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                         <div className="flex items-center gap-2">
@@ -74,10 +109,32 @@ const NotificationBell: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Filter Tabs */}
+                    <div className="flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        {filterTabs.map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setFilter(tab.key)}
+                                className={`flex-1 py-2 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5
+                                    ${filter === tab.key
+                                        ? 'border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }`}
+                            >
+                                {tab.label}
+                                {tab.count > 0 && (
+                                    <span className="bg-up-maroon-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
                     {/* Notification List */}
-                    <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
-                        {notifications.length > 0 ? (
-                            notifications.map(n => (
+                    <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                        {filteredNotifications.length > 0 ? (
+                            filteredNotifications.map(n => (
                                 <div
                                     key={n.id}
                                     onClick={() => handleNotificationClick(n.id, n.link)}
@@ -93,15 +150,26 @@ const NotificationBell: React.FC = () => {
                                     </div>
 
                                     <div className="flex-1 min-w-0">
-                                        {/* Title */}
-                                        {n.title && (
-                                            <p className={`text-sm font-heading tracking-wide mb-0.5
-                                                ${!n.isRead
-                                                    ? 'font-bold text-up-maroon-800 dark:text-up-maroon-300'
-                                                    : 'font-semibold text-slate-700 dark:text-slate-300'}`}>
-                                                {n.title}
-                                            </p>
-                                        )}
+                                        {/* Category tag + title row */}
+                                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                            {categorize(n) !== 'other' && (
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                                                    ${categorize(n) === 'equipment'
+                                                        ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300'
+                                                        : 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                                                    }`}>
+                                                    {categorize(n) === 'equipment' ? 'Equipment' : 'Room'}
+                                                </span>
+                                            )}
+                                            {n.title && (
+                                                <p className={`text-sm font-heading tracking-wide
+                                                    ${!n.isRead
+                                                        ? 'font-bold text-up-maroon-800 dark:text-up-maroon-300'
+                                                        : 'font-semibold text-slate-700 dark:text-slate-300'}`}>
+                                                    {n.title}
+                                                </p>
+                                            )}
+                                        </div>
                                         {/* Message */}
                                         <p className={`text-sm leading-snug
                                             ${!n.isRead
@@ -120,20 +188,21 @@ const NotificationBell: React.FC = () => {
                             <div className="flex flex-col items-center justify-center py-12 gap-2">
                                 <BellIcon className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                                 <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
-                                    You're all caught up!
+                                    {filter === 'all' ? "You're all caught up!" : `No ${filter} notifications.`}
                                 </p>
                                 <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-                                    No notifications yet.
+                                    {filter === 'all' ? 'No notifications yet.' : 'Try switching to All.'}
                                 </p>
                             </div>
                         )}
                     </div>
 
                     {/* Footer */}
-                    {notifications.length > 0 && (
+                    {filteredNotifications.length > 0 && (
                         <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-center">
                             <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-                                Showing {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
+                                Showing {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? 's' : ''}
+                                {filter !== 'all' ? ` in ${filter}` : ''}
                             </p>
                         </div>
                     )}
