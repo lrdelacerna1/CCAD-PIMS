@@ -31,7 +31,7 @@ const AreaManagement: React.FC<AreaManagementProps> = ({ areas, users, refreshDa
         setError('');
         try {
             if (editingArea) {
-                await updateAreaApi(editingArea.id, newAreaName.trim());
+                await updateAreaApi(editingArea.id, { name: newAreaName.trim() });
             } else {
                 await createAreaApi(newAreaName.trim());
             }
