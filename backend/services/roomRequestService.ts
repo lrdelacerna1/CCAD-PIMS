@@ -12,7 +12,7 @@ import {
     writeBatch
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { RoomRequest, RoomRequestStatus, RoomType } from '../../frontend/types';
+import { RoomRequest, RoomRequestStatus } from '../../frontend/types';
 import { NotificationService } from "./notificationService";
 
 interface User {
@@ -22,6 +22,28 @@ interface User {
 
 const roomRequestsCollection = collection(db, "roomRequests");
 const usersCollection = collection(db, "users");
+
+// Helper: notify all area admins + superadmins
+async function notifyAdmins(areaId: string, title: string, message: string) {
+    const areaRef = doc(db, "areas", areaId);
+    const areaSnap = await getDoc(areaRef);
+    const areaAdminIds: string[] = areaSnap.exists() ? (areaSnap.data()?.adminIds || []) : [];
+
+    const superAdminSnap = await getDocs(query(usersCollection, where("role", "==", "superadmin")));
+    const superAdminIds = superAdminSnap.docs.map(d => d.id);
+
+    const allAdminIds = [...new Set([...areaAdminIds, ...superAdminIds])];
+
+    await Promise.all(allAdminIds.map(adminId =>
+        NotificationService.createNotification({
+            userId: adminId,
+            title,
+            message,
+            isRead: false,
+            link: "/all-requests"
+        })
+    ));
+}
 
 export const RoomRequestService = {
 
@@ -95,6 +117,7 @@ export const RoomRequestService = {
         const createdData = newDocSnap.data();
 
         if (initialStatus === 'Pending Endorsement' && (data as any).endorserEmail) {
+            // Notify endorser
             const endorserQuery = query(usersCollection, where("emailAddress", "==", (data as any).endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
@@ -107,6 +130,13 @@ export const RoomRequestService = {
                     link: "/my-endorsements"
                 });
             }
+        } else if (initialStatus === 'Pending Approval') {
+            // Notify area admins + superadmins directly
+            await notifyAdmins(
+                areaId,
+                "New Room Request",
+                `${data.userName} has submitted a room request pending your approval.`
+            );
         }
 
         return {
@@ -125,13 +155,12 @@ export const RoomRequestService = {
         const oldStatus = request.status;
 
         const updateData: any = { status };
-
         if (status === 'Rejected' && rejectionReason) {
             updateData.rejectionReason = rejectionReason;
         }
-
         await updateDoc(reqRef, updateData);
 
+        // Notify the requester
         if (status === 'Completed') {
             await NotificationService.createNotification({
                 userId: request.userId,
@@ -150,20 +179,30 @@ export const RoomRequestService = {
             });
         }
 
-        if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval' && request.endorserEmail) {
-            const endorserQuery = query(usersCollection, where("emailAddress", "==", request.endorserEmail));
-            const endorserSnapshot = await getDocs(endorserQuery);
-            if (!endorserSnapshot.empty) {
-                const endorserId = endorserSnapshot.docs[0].id;
-                await NotificationService.createNotification({
-                    userId: endorserId,
-                    title: "Request Endorsed",
-                    message: `You have successfully endorsed the room request for "${request.purpose}" by ${request.userName}.`,
-                    isRead: false,
-                    link: "/my-endorsements"
-                });
+        // Endorsement flow → now pending admin approval
+        if (oldStatus === 'Pending Endorsement' && status === 'Pending Approval') {
+            if (request.endorserEmail) {
+                const endorserQuery = query(usersCollection, where("emailAddress", "==", request.endorserEmail));
+                const endorserSnapshot = await getDocs(endorserQuery);
+                if (!endorserSnapshot.empty) {
+                    const endorserId = endorserSnapshot.docs[0].id;
+                    await NotificationService.createNotification({
+                        userId: endorserId,
+                        title: "Request Endorsed",
+                        message: `You have successfully endorsed the room request for "${request.purpose}" by ${request.userName}.`,
+                        isRead: false,
+                        link: "/my-endorsements"
+                    });
+                }
             }
+            // Notify admins that endorsed request needs their approval
+            await notifyAdmins(
+                request.areaId,
+                "Endorsed Request Awaiting Approval",
+                `${request.userName}'s room request has been endorsed and is now pending your approval.`
+            );
         } else if (request.endorserEmail) {
+            // Notify endorser of other status updates
             const endorserQuery = query(usersCollection, where("emailAddress", "==", request.endorserEmail));
             const endorserSnapshot = await getDocs(endorserQuery);
             if (!endorserSnapshot.empty) {
@@ -197,6 +236,7 @@ export const RoomRequestService = {
         await batch.commit();
 
         for (const req of requestsToNotify) {
+            // Notify requester
             if (status === 'Completed') {
                 await NotificationService.createNotification({
                     userId: req.userId,
@@ -215,19 +255,26 @@ export const RoomRequestService = {
                 });
             }
 
-            if (req.status === 'Pending Endorsement' && status === 'Pending Approval' && req.endorserEmail) {
-                const endorserQuery = query(usersCollection, where("emailAddress", "==", req.endorserEmail));
-                const endorserSnapshot = await getDocs(endorserQuery);
-                if (!endorserSnapshot.empty) {
-                    const endorserId = endorserSnapshot.docs[0].id;
-                    await NotificationService.createNotification({
-                        userId: endorserId,
-                        title: "Request Endorsed",
-                        message: `You have successfully endorsed the room request for "${req.purpose}" by ${req.userName}.`,
-                        isRead: false,
-                        link: "/my-endorsements"
-                    });
+            if (req.status === 'Pending Endorsement' && status === 'Pending Approval') {
+                if (req.endorserEmail) {
+                    const endorserQuery = query(usersCollection, where("emailAddress", "==", req.endorserEmail));
+                    const endorserSnapshot = await getDocs(endorserQuery);
+                    if (!endorserSnapshot.empty) {
+                        const endorserId = endorserSnapshot.docs[0].id;
+                        await NotificationService.createNotification({
+                            userId: endorserId,
+                            title: "Request Endorsed",
+                            message: `You have successfully endorsed the room request for "${req.purpose}" by ${req.userName}.`,
+                            isRead: false,
+                            link: "/my-endorsements"
+                        });
+                    }
                 }
+                await notifyAdmins(
+                    req.areaId,
+                    "Endorsed Request Awaiting Approval",
+                    `${req.userName}'s room request has been endorsed and is now pending your approval.`
+                );
             } else if (req.endorserEmail) {
                 const endorserQuery = query(usersCollection, where("emailAddress", "==", req.endorserEmail));
                 const endorserSnapshot = await getDocs(endorserQuery);
