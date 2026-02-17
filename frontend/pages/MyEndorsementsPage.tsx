@@ -56,33 +56,34 @@ const RequestsTable: React.FC<{
         return 'N/A';
     };
 
-    const getDateTimeString = (req: AnyRequest) => {
-        if (!req.requestedStartDate) {
-            return 'N/A';
-        }
+    // AFTER
+    const toDate = (dateStr: string) => {
+        // If already has time component, parse as-is; otherwise treat as UTC date-only
+        return new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00Z');
+    };
 
-        const startDate = new Date(req.requestedStartDate + 'T00:00:00Z');
-        if (isNaN(startDate.getTime())) {
-            return 'Invalid date';
-        }
+    const getDateTimeString = (req: AnyRequest) => {
+        if (!req.requestedStartDate) return 'N/A';
+
+        const startDate = toDate(req.requestedStartDate);
+        if (isNaN(startDate.getTime())) return 'Invalid date';
         const start = format(startDate, 'MMM d, yyyy');
 
         if ('requestedItems' in req) {
-            if (!req.requestedEndDate) {
-                return start;
-            }
-            const endDate = new Date(req.requestedEndDate + 'T00:00:00Z');
-            if (isNaN(endDate.getTime())) {
-                return start;
-            }
+            // Equipment — dates include time, show date + time range
+            const startTime = req.requestedStartTime || format(startDate, 'HH:mm');
+            if (!req.requestedEndDate) return `${start} at ${startTime}`;
+            const endDate = toDate(req.requestedEndDate);
             const end = format(endDate, 'MMM d, yyyy');
-            return start === end ? start : `${start} to ${end}`;
+            const endTime = req.requestedEndTime || format(endDate, 'HH:mm');
+            return start === end
+                ? `${start} at ${startTime} - ${endTime}`
+                : `${start} to ${end} at ${startTime} - ${endTime}`;
         } else {
+            // Room — dates are date-only strings
             const startTime = 'requestedStartTime' in req ? req.requestedStartTime : '';
             const endTime = 'requestedEndTime' in req ? req.requestedEndTime : '';
-            if (startTime && endTime) {
-                return `${start} at ${startTime} - ${endTime}`;
-            }
+            if (startTime && endTime) return `${start} at ${startTime} - ${endTime}`;
             return start;
         }
     };
