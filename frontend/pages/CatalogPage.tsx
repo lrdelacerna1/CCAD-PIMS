@@ -5,7 +5,7 @@ import RoomCatalog from '../components/catalog/RoomCatalog';
 import NewEquipmentRequestModal from '../components/requests/NewEquipmentRequestModal';
 import NewRoomRequestModal from '../components/requests/NewRoomRequestModal';
 import ItemDetailsModal from '../components/catalog/ItemDetailsModal';
-import { Area, InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance, ReservationSettings } from '../types';
+import { Area, InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance, ReservationSettings, EquipmentCartEntry, RoomCartEntry } from '../types';
 import { getAreasApi } from '../../backend/api/areas';
 import { Cart } from '../components/catalog/Cart';
 import { useCartAvailability } from '../hooks/useCartAvailability';
@@ -14,10 +14,6 @@ import InstanceSelectionModal from '../components/catalog/InstanceSelectionModal
 import { getInventoryCatalogApi } from '../../backend/api/inventory';
 import { getRoomCatalogApi } from '../../backend/api/rooms';
 import { getSettingsApi } from '../../backend/api/settings';
-
-// Explicit cart value types so TypeScript never widens to unknown
-type EquipmentCartEntry = { item: InventoryItemForCatalog; instances: Map<string, InventoryInstance> };
-type RoomCartEntry = { type: RoomTypeForCatalog; instance: RoomInstance };
 
 const CatalogPage: React.FC = () => {
     const location = useLocation();
@@ -46,7 +42,7 @@ const CatalogPage: React.FC = () => {
     const [equipmentCart, setEquipmentCart] = useState<Map<string, EquipmentCartEntry>>(new Map());
     const [roomCart, setRoomCart] = useState<Map<string, RoomCartEntry>>(new Map());
 
-    const activeCart = activeTab === 'equipment' ? equipmentCart : roomCart;
+    const activeCart: EquipmentCart | RoomCart = activeTab === 'equipment' ? equipmentCart : roomCart;
     const { availability, isLoading: isAvailabilityLoading, isCartSubmittable } = useCartAvailability(activeCart, startDate, endDate, activeTab);
 
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);

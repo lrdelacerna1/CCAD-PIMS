@@ -251,3 +251,8 @@ export interface ReservationSettings {
     minimumLeadDays: number;
     // Add other settings fields here as needed
 }
+
+export type EquipmentCartEntry = { item: InventoryItemForCatalog; instances: Map<string, InventoryInstance> };
+export type RoomCartEntry = { type: RoomTypeForCatalog; instance: RoomInstance };
+export type EquipmentCart = Map<string, EquipmentCartEntry>;
+export type RoomCart = Map<string, RoomCartEntry>;

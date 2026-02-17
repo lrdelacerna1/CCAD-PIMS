@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance } from '../types';
+import { InventoryItemForCatalog, RoomTypeForCatalog, InventoryInstance, RoomInstance, EquipmentCart, RoomCart } from '../types';
 import { checkAvailabilityApi } from '../../backend/api/inventory';
 import { checkRoomAvailabilityApi } from '../../backend/api/rooms';
 
-type EquipmentCart = Map<string, { item: InventoryItemForCatalog, instances: Map<string, InventoryInstance> }>;
-type RoomCart = Map<string, { type: RoomTypeForCatalog, instance: RoomInstance }>;
 type Cart = EquipmentCart | RoomCart;
 type ResourceType = 'equipment' | 'rooms';
 
