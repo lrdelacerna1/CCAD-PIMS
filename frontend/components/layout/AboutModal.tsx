@@ -15,7 +15,6 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
 
     const [activeTab, setActiveTab] = useState(isAdminOrSuperAdmin ? 'requests' : 'howTo');
 
-    // Updated to use Black for active state instead of Maroon
     const activeTabClasses = "border-black text-black dark:text-white font-bold";
     const inactiveTabClasses = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-200 dark:hover:text-slate-300";
 
@@ -56,8 +55,8 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                         
                         <SectionHeader icon={<ClipboardDocumentCheckIcon className="w-5 h-5 text-black dark:text-white"/>} title="The Request Lifecycle" />
                         <ul className="list-decimal list-inside space-y-3 pl-2">
-                            <li><span className="font-semibold">Pending Endorsement:</span> A student has submitted a request that requires faculty endorsement. It will not appear in your main approval queue until it is endorsed.</li>
-                            <li><span className="font-semibold">Pending Approval:</span> The request has been endorsed (or was submitted by a non-student) and now appears in your 'Reservations' queue. You should review the purpose and dates, then either approve or reject it.</li>
+                            <li><span className="font-semibold">Pending Endorsement:</span> This is the initial status for all requests made by Students. The request is awaiting endorsement from the specified faculty member and will not appear in your approval queue until it is endorsed. Guest users may also have this status if they optionally provide an endorser.</li>
+                            <li><span className="font-semibold">Pending Approval:</span> The request is ready for your review. This happens if the request was submitted by a Faculty/Admin, after a Student's request has been endorsed, or if a Guest submits a request without an endorser. You should review the purpose and dates, then either approve or reject it.</li>
                             <li><span className="font-semibold">Approve:</span> Approving a request changes its status to 'Approved'. The user is notified. You can then proceed to mark it as 'Ready for Pickup' or 'Ready for Check-in' when the time comes.</li>
                             <li><span className="font-semibold">Reject:</span> If a request cannot be fulfilled, reject it. The user will be notified.</li>
                              <li><span className="font-semibold">Closed/Completed/Returned:</span> The reservation is complete. This happens after an item has been successfully returned or a room booking has ended.</li>
@@ -115,22 +114,29 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                  return (
                     <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-heading">Users, Roles, & Areas</h3>
-                        {isSuperAdmin ? (
-                            <p>As a Super Admin, you have full control over the system's structure and administrator permissions.</p>
-                        ) : (
-                            <p>As an Admin, your view and management capabilities are defined by the Areas you are assigned to. This guide explains your role within that structure.</p>
-                        )}
+                        <p>This system uses a role-based access control model to ensure users and admins only have access to relevant information and actions.</p>
 
-
-                        <SectionHeader icon={<UserGroupIcon className="w-5 h-5 text-black dark:text-white"/>} title="Role Breakdown" />
+                        <SectionHeader icon={<UserGroupIcon className="w-5 h-5 text-black dark:text-white"/>} title="User Roles" />
                         <dl className="space-y-3">
                             <div>
                                 <dt className="font-semibold text-slate-700 dark:text-slate-200">Super Admin {isSuperAdmin && '(You)'}</dt>
-                                <dd>Has unrestricted, global access. Can see and manage all areas, inventory, and requests. This is the only role that can create/delete Areas and assign Admins to them.</dd>
+                                <dd>Has unrestricted, global access. Can create and manage Areas, manage all inventory, see all requests, and manage user roles (including approving faculty appeals and promoting users to Admin).</dd>
                             </div>
-                             <div>
+                            <div>
                                 <dt className="font-semibold text-slate-700 dark:text-slate-200">Admin {isAdmin && '(You)'}</dt>
-                                <dd>Has restricted access. An Admin's view is limited to the specific <span className="font-semibold">Areas</span> they are assigned to. They can only manage inventory and requests that belong to their assigned areas.</dd>
+                                <dd>Has restricted access limited to the specific <span className="font-semibold">Areas</span> they are assigned to by a Super Admin. They can only manage inventory and requests that belong to their assigned areas.</dd>
+                            </div>
+                            <div>
+                                <dt className="font-semibold text-slate-700 dark:text-slate-200">Faculty</dt>
+                                <dd>A verified faculty member. They can make their own reservation requests without needing an endorser, and they can endorse requests submitted by students.</dd>
+                            </div>
+                            <div>
+                                <dt className="font-semibold text-slate-700 dark:text-slate-200">Student</dt>
+                                <dd>A standard user who can make reservation requests but requires a faculty member to endorse them.</dd>
+                            </div>
+                            <div>
+                                <dt className="font-semibold text-slate-700 dark:text-slate-200">Pending Faculty</dt>
+                                <dd>A user who has registered and submitted an appeal for faculty status. They are awaiting Super Admin approval.</dd>
                             </div>
                         </dl>
 
@@ -140,8 +146,8 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                                 <p>Areas are the core of access control for standard Admins. For a large campus, a Super Admin might create Areas like "Film Department" or "IT Services", then assign different Admins to manage each one, ensuring they only see what's relevant to their role.</p>
                             </FAQItem>
                             {isSuperAdmin && (
-                                <FAQItem question="How do I make a regular user into an Admin?">
-                                    <p>User roles are managed in the backend database. This admin panel does not allow for role changes. Your responsibility is to take existing users who are already designated as 'Admin' and assign them to the correct Areas to manage.</p>
+                                <FAQItem question="How do I promote a user to an Admin?">
+                                    <p>1. First, the user must be a verified <span className="font-semibold">Faculty</span> member. If their account is 'Student' or 'Pending Faculty', you must approve their faculty appeal from the 'User Management' dashboard first.<br/>2. Once they are a Faculty member, you can promote them to 'Admin' using the role dropdown on the 'User Management' page. You can then assign them to one or more Areas.</p>
                                 </FAQItem>
                             )}
                             <FAQItem question="As an Admin, I can't see any requests. What should I check?">
@@ -189,13 +195,19 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                             <li><span className="font-semibold">Browse the Catalog:</span> Go to the 'Catalog' page to see all available equipment and rooms. You can search and filter by campus area.</li>
                             <li><span className="font-semibold">Select Your Dates:</span> In the cart sidebar on the right, choose the start and end dates for your reservation. The catalog will automatically show what's available for that period.</li>
                             <li><span className="font-semibold">Add to Cart:</span> Click 'Add to Cart' for any item you need. For equipment, you can add multiple types and adjust quantities in the cart. For rooms, you can only reserve one at a time.</li>
-                            <li><span className="font-semibold">Finalize & Submit:</span> Once your cart is ready, click 'Finalize Request'. A form will appear where you'll provide details like the purpose of your request and an endorser if you are a student. After submitting, your request is sent for approval.</li>
+                            <li><span className="font-semibold">Finalize & Submit:</span> Once your cart is ready, click 'Finalize Request'. A form will appear where you'll provide details like the purpose of your request and an endorser. After submitting, your request is sent for approval.</li>
                         </ul>
 
                         <SectionHeader icon={<ClipboardDocumentCheckIcon className="w-5 h-5 text-black dark:text-white"/>} title="Frequently Asked Questions (FAQ)" />
                          <div className="space-y-2">
                             <FAQItem question="What happens after I submit my request?">
-                                <p>If you are a student, your request will first go to your specified endorser with a status of 'Pending Endorsement'. Once endorsed, its status changes to 'Pending Approval' and is sent to an administrator. If you are not a student, your request goes directly to 'Pending Approval'. You will receive notifications as your request status changes.</p>
+                                <p>If you are a <span className="font-semibold">Student</span>, your request will first go to your specified faculty endorser with a status of 'Pending Endorsement'. Once they endorse it, its status changes to 'Pending Approval' and is sent to an administrator for final review. This endorsement step is required.</p>
+                                <p className="mt-2">If you are a <span className="font-semibold">Faculty</span> member, your request goes directly to 'Pending Approval'.</p>
+                                <p className="mt-2">If you are a <span className="font-semibold">Guest</span>, providing a faculty endorser is optional. If you provide one, your request follows the same path as a student's. If you leave the endorser field blank, it goes directly to 'Pending Approval' for admin review.</p>
+                                <p className="mt-2">You will receive notifications as your request status changes.</p>
+                            </FAQItem>
+                            <FAQItem question="My account says 'Pending Faculty'. What does this mean?">
+                                 <p>You have successfully registered and submitted an appeal for faculty status. A Super Admin now needs to review and approve your request. Once approved, you will gain faculty privileges, such as endorsing student requests and making your own requests without needing further action.</p>
                             </FAQItem>
                              <FAQItem question="Why is an item I want 'Unavailable'?">
                                 <p>An item is marked as 'Unavailable' if all its units are already reserved by other users for the date range you have selected (including requests that are still pending approval). Try adjusting your dates to see if it becomes available.</p>
@@ -213,7 +225,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 mb-4">
                              <LegendItem label="Pending Endorsement" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been submitted and is awaiting endorsement by your specified endorser." />
                              <LegendItem label="Pending Approval" badgeClass="bg-up-gold-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300" description="Your request has been endorsed and is now waiting for a final review from an area administrator." />
-                             <LegendItem label="Approved" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="Your request has been approved! It will be ready on the scheduled date." />
+                             <LegendItem label="Approved" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/4G`00" description="Your request has been approved! It will be ready on the scheduled date." />
                              <LegendItem label="Ready for Pickup / Check-in" badgeClass="bg-up-green-100 text-up-green-800 dark:bg-up-green-900/40 dark:text-up-green-300" description="The item/room is ready for you." />
                               <LegendItem label="In Use" badgeClass="bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300" description="You have picked up the item or checked into the room." />
                              <LegendItem label="Returned / Completed" badgeClass="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300" description="Your reservation is complete." />
@@ -233,7 +245,6 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 
-                {/* Updated Header with Black Background */}
                 <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-black rounded-t-xl text-white">
                     <div>
                         <h3 className="text-xl font-bold font-heading text-white">
