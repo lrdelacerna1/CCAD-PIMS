@@ -6,6 +6,7 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { User } from "../types";
@@ -24,18 +25,18 @@ export const appealService = {
     lastName: string
   ) => {
     try {
-      const appealRef = doc(db, "faculty_appeals", userId);
+      // ✅ Auto-generate appeal doc ID — don't use userId as the doc ID
+      const appealRef = doc(collection(db, "faculty_appeals"));
       await setDoc(appealRef, {
-        userId,
+        userId,   // store Auth UID as a field only
         email,
         firstName,
         lastName,
         status: "pending",
         createdAt: serverTimestamp(),
       });
-      
+
       const superAdminIds = await notificationService.getSuperAdmins();
-      
       await Promise.all(
         superAdminIds.map(adminId =>
           notificationService.createNotification(
@@ -59,14 +60,14 @@ export const appealService = {
       const appeals: Appeal[] = [];
       appealSnapshot.forEach((doc) => {
         const data = doc.data();
-        appeals.push({ 
-          id: doc.id, 
+        appeals.push({
+          id: doc.id,
           userId: data.userId,
           email: data.email,
           firstName: data.firstName,
           lastName: data.lastName,
           status: data.status,
-          ...data 
+          ...data
         } as Appeal);
       });
       return appeals;
@@ -76,46 +77,58 @@ export const appealService = {
     }
   },
 
-  // Updated function signature to match the component usage
   updateAppealStatus: async (
     appealId: string,
     userId: string,
     status: "approved" | "rejected"
   ) => {
     try {
-      if (!userId) {
-        throw new Error('User ID is required to update appeal status.');
-      }
-      
-      if (!status) {
-        throw new Error('Status is required to update appeal.');
-      }
+      if (!userId) throw new Error('User ID is required to update appeal status.');
+      if (!status) throw new Error('Status is required to update appeal.');
 
-      // Update the appeal document
+      // ✅ Fetch the appeal first to ensure userId is correct
       const appealRef = doc(db, "faculty_appeals", appealId);
+      const appealSnap = await getDoc(appealRef); // add getDoc to imports
+
+      if (!appealSnap.exists()) throw new Error(`Appeal ${appealId} not found.`);
+
+      const appealData = appealSnap.data();
+      const resolvedUserId = appealData.userId; // Always use the stored userId
+
+      // ✅ Log to verify the correct user document is being targeted
+      console.log(`Updating user document: users/${resolvedUserId}`);
+
       await updateDoc(appealRef, { status });
 
-      // Update the user's role
-      const userRef = doc(db, "users", userId);
+      const userRef = doc(db, "users", resolvedUserId);
+      const userSnap = await getDoc(userRef);
+
+      // ✅ Warn if user document doesn't exist
+      if (!userSnap.exists()) {
+        console.warn(`No user document found at users/${resolvedUserId}. A new one will be created.`);
+      }
+
       if (status === "approved") {
-        await updateDoc(userRef, { role: "faculty" });
-        
+        await setDoc(userRef, { role: "faculty" }, { merge: true });
+
         await notificationService.createNotification(
-          userId,
+          resolvedUserId,
           'Your faculty appeal has been approved. You now have faculty access.',
           '/',
           'Faculty Appeal Approved'
         );
       } else if (status === "rejected") {
-        await updateDoc(userRef, { role: "guest" });
-        
+        await setDoc(userRef, { role: "guest" }, { merge: true });
+
         await notificationService.createNotification(
-          userId,
+          resolvedUserId,
           'Your faculty appeal has been rejected. Please contact support for more information.',
           '/',
           'Faculty Appeal Rejected'
         );
       }
+
+      console.log(`✅ Successfully updated users/${resolvedUserId} role to: ${status === "approved" ? "faculty" : "guest"}`);
     } catch (error) {
       console.error('Failed to update appeal status:', error);
       throw new Error('Failed to update appeal status.');

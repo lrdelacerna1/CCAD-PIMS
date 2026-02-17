@@ -249,7 +249,8 @@ export interface Penalty {
 
 export interface ReservationSettings {
     minimumLeadDays: number;
-    // Add other settings fields here as needed
+    penaltyAmount: number;
+    penaltyInterval: 'per_day' | 'per_hour';
 }
 
 export type EquipmentCartEntry = { item: InventoryItemForCatalog; instances: Map<string, InventoryInstance> };

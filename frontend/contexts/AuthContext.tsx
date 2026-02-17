@@ -145,42 +145,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign Up with Google - For Register Page (creates new accounts)
     const signUpWithGoogle = async (): Promise<FirebaseUser | null> => {
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         try {
             const result = await signInWithPopup(auth, provider);
             const googleUser = result.user;
-
+    
             if (!googleUser.email) {
                 await firebaseSignOut(auth);
                 throw new Error("Could not retrieve email from Google account.");
             }
-
-            // Check if user already exists
+    
             const userDocRef = doc(db, 'users', googleUser.uid);
             const userDoc = await getDoc(userDocRef);
-
+    
             if (userDoc.exists()) {
-                // User already exists - sign them out and throw error
                 await firebaseSignOut(auth);
                 throw new Error("An account with this email already exists. Please sign in instead.");
             }
-
-            // Create new user document
+    
             const newUser: Omit<User, 'id'> = {
                 emailAddress: googleUser.email,
                 emailVerified: googleUser.emailVerified,
-                role: 'guest', // Will be updated based on email domain in RegisterPage
+                role: 'guest',
                 firstName: googleUser.displayName?.split(' ')[0] || 'New',
                 lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || 'User',
                 createdAt: new Date().toISOString(),
                 lastLogin: new Date().toISOString(),
-                name: '',
-                email: ''
             };
             
             await setDoc(userDocRef, newUser);
+    
+            // ✅ Immediately populate user state — don't wait for onAuthStateChanged
+            const userPayload = { id: googleUser.uid, ...newUser } as unknown as User;
+            setUser(userPayload);
+            setIsSuperAdmin(false);
+            setIsAdmin(false);
+            setIsFaculty(false);
+            setIsUser(true);
             
             return googleUser;
         } catch (error: any) {
+            if (error.code === 'auth/cancelled-popup-request' ||
+                error.code === 'auth/popup-closed-by-user') {
+                return null;
+            }
             console.error("Google Sign-up failed:", error.message);
             throw new Error(error.message || "An unexpected error occurred during Google Sign-up.");
         }
@@ -234,25 +242,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const updateProfile = async (updates: Partial<User>) => {
-        if (!user) throw new Error("No user is signed in.");
+        const currentFirebaseUser = auth.currentUser;
+        const userId = user?.id ?? currentFirebaseUser?.uid;
+    
+        if (!userId) throw new Error("No user is signed in.");
+        
         try {
-            await authService.updateUser(user.id, updates);
+            await authService.updateUser(userId, updates);
             
-            const newUserState = { ...user, ...updates };
+            // Merge with existing user state or build from scratch
+            const baseUser = user ?? { id: userId } as User;
+            const newUserState = { ...baseUser, ...updates };
             setUser(newUserState);
-
+    
             if (updates.role) {
                 const newRole = updates.role;
                 const isSuperAdminRole = newRole === 'superadmin';
                 const isAdminRole = newRole === 'admin' || isSuperAdminRole;
                 const isFacultyRole = newRole === 'faculty';
-
+    
                 setIsSuperAdmin(isSuperAdminRole);
                 setIsAdmin(isAdminRole);
                 setIsFaculty(isFacultyRole);
                 setIsUser(!isAdminRole && !isFacultyRole);
             }
-
         } catch (error) {
             console.error("Failed to update profile:", error);
             throw error;

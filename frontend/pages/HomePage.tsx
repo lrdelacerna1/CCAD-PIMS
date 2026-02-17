@@ -5,7 +5,11 @@ import UserDashboard from '../components/dashboard/UserDashboard';
 import GuestHomePage from '../components/dashboard/GuestHomePage';
 
 const HomePage: React.FC = () => {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
 
     if (user) {
         if (user.role === 'admin' || user.role === 'superadmin') {

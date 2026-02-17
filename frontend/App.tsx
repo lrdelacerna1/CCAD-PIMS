@@ -29,22 +29,17 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 const AppContent: React.FC = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
-  const [roleSelected, setRoleSelected] = useState(false);
-
+  
   const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
   const headerVariant = authRoutes.includes(location.pathname) ? 'auth' : 'main';
-
-  const handleRoleSelected = () => {
-    setRoleSelected(true);
-  };
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><p>Loading...</p></div>;
   }
 
-  if (user && user.role === 'pending-faculty' && !roleSelected) {
-    return <RoleSelectionModal user={user} onRoleSelected={handleRoleSelected} />;
-  }
+  // ✅ Don't intercept if user is on /register, or roleSelected already
+  const isOnRegisterPage = location.pathname === '/register';
+
 
   return (
     <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
@@ -65,66 +60,66 @@ const AppContent: React.FC = () => {
             <ProtectedRoute>
               <HomePage />
             </ProtectedRoute>
-          }/>
+          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <ProfilePage />
             </ProtectedRoute>
-          }/>
+          } />
           <Route path="/my-reservations" element={
             <ProtectedRoute>
               <MyReservationsPage />
             </ProtectedRoute>
-          }/>
+          } />
           <Route path="/catalog" element={
             <ProtectedRoute>
               <CatalogPage />
             </ProtectedRoute>
-          }/>
+          } />
 
           {/* Faculty Routes */}
           <Route path="/my-endorsements" element={
             <FacultyRoute>
               <MyEndorsementsPage />
             </FacultyRoute>
-          }/>
+          } />
 
           {/* Admin Routes */}
           <Route path="/admin" element={
             <AdminRoute>
               <AdminDashboardPage />
             </AdminRoute>
-          }/>
+          } />
 
           <Route path="/requests" element={
             <AdminRoute>
               <RequestsPage />
             </AdminRoute>
-          }/>
+          } />
 
           <Route path="/all-requests" element={
             <AdminRoute>
               <AllRequestsPage />
             </AdminRoute>
-          }/>
+          } />
 
           <Route path="/inventory" element={
             <AdminRoute>
               <InventoryPage />
             </AdminRoute>
-          }/>
+          } />
 
           <Route path="/settings" element={
             <AdminRoute>
               <SettingsPage />
             </AdminRoute>
-          }/>
-          
+          } />
+
           <Route path="/superadmin" element={
             <AdminRoute>
               <SuperAdminDashboard />
             </AdminRoute>
-          }/>
+          } />
 
         </Routes>
       </main>

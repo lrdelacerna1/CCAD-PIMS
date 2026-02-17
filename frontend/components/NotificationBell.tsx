@@ -83,14 +83,14 @@ const NotificationBell: React.FC = () => {
                 )}
             </button>
 
-            {/* Dropdown */}
+            {/* Dropdown - Responsive */}
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-slate-800 rounded-xl shadow-xl z-50 border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white dark:bg-slate-800 rounded-xl shadow-xl z-50 border border-slate-200 dark:border-slate-700 overflow-hidden">
 
                     {/* Header */}
-                    <div className="px-4 py-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                    <div className="px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                         <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-slate-900 dark:text-white font-heading tracking-wide">
+                            <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white font-heading tracking-wide">
                                 Notifications
                             </h3>
                             {unreadCount > 0 && (
@@ -102,9 +102,9 @@ const NotificationBell: React.FC = () => {
                         {unreadCount > 0 && (
                             <button
                                 onClick={handleMarkAllReadClick}
-                                className="text-xs font-semibold text-up-maroon-700 hover:text-up-maroon-900 dark:text-up-maroon-400 dark:hover:text-up-maroon-300 hover:underline transition-colors"
+                                className="text-xs font-semibold text-up-maroon-700 hover:text-up-maroon-900 dark:text-up-maroon-400 dark:hover:text-up-maroon-300 hover:underline transition-colors whitespace-nowrap"
                             >
-                                Mark all as read
+                                Mark all read
                             </button>
                         )}
                     </div>
@@ -115,13 +115,14 @@ const NotificationBell: React.FC = () => {
                             <button
                                 key={tab.key}
                                 onClick={() => setFilter(tab.key)}
-                                className={`flex-1 py-2 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5
+                                className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 sm:gap-1.5
                                     ${filter === tab.key
                                         ? 'border-b-2 border-up-maroon-700 text-up-maroon-700 dark:text-up-maroon-400'
                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                                     }`}
                             >
-                                {tab.label}
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                <span className="sm:hidden">{tab.label === 'Equipment' ? 'Equip.' : tab.label}</span>
                                 {tab.count > 0 && (
                                     <span className="bg-up-maroon-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                                         {tab.count}
@@ -132,13 +133,13 @@ const NotificationBell: React.FC = () => {
                     </div>
 
                     {/* Notification List */}
-                    <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                    <div className="max-h-[60vh] sm:max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
                         {filteredNotifications.length > 0 ? (
                             filteredNotifications.map(n => (
                                 <div
                                     key={n.id}
                                     onClick={() => handleNotificationClick(n.id, n.link)}
-                                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/60
+                                    className={`flex items-start gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/60
                                         ${!n.isRead ? 'bg-up-maroon-50 dark:bg-up-maroon-900/20' : 'bg-white dark:bg-slate-800'}`}
                                 >
                                     {/* Unread dot */}
@@ -151,9 +152,9 @@ const NotificationBell: React.FC = () => {
 
                                     <div className="flex-1 min-w-0">
                                         {/* Category tag + title row */}
-                                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                        <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 flex-wrap">
                                             {categorize(n) !== 'other' && (
-                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                                                <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
                                                     ${categorize(n) === 'equipment'
                                                         ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300'
                                                         : 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
@@ -162,7 +163,7 @@ const NotificationBell: React.FC = () => {
                                                 </span>
                                             )}
                                             {n.title && (
-                                                <p className={`text-sm font-heading tracking-wide
+                                                <p className={`text-xs sm:text-sm font-heading tracking-wide
                                                     ${!n.isRead
                                                         ? 'font-bold text-up-maroon-800 dark:text-up-maroon-300'
                                                         : 'font-semibold text-slate-700 dark:text-slate-300'}`}>
@@ -171,26 +172,26 @@ const NotificationBell: React.FC = () => {
                                             )}
                                         </div>
                                         {/* Message */}
-                                        <p className={`text-sm leading-snug
+                                        <p className={`text-xs sm:text-sm leading-snug
                                             ${!n.isRead
                                                 ? 'text-slate-800 dark:text-slate-200'
                                                 : 'text-slate-500 dark:text-slate-400'}`}>
                                             {n.message}
                                         </p>
                                         {/* Timestamp */}
-                                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 italic">
+                                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1 italic">
                                             {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
                                         </p>
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-12 gap-2">
+                            <div className="flex flex-col items-center justify-center py-8 sm:py-12 gap-2">
                                 <BellIcon className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                                <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
+                                <p className="text-xs sm:text-sm font-medium text-slate-400 dark:text-slate-500">
                                     {filter === 'all' ? "You're all caught up!" : `No ${filter} notifications.`}
                                 </p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 italic">
                                     {filter === 'all' ? 'No notifications yet.' : 'Try switching to All.'}
                                 </p>
                             </div>
@@ -199,8 +200,8 @@ const NotificationBell: React.FC = () => {
 
                     {/* Footer */}
                     {filteredNotifications.length > 0 && (
-                        <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-center">
-                            <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                        <div className="px-3 sm:px-4 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-center">
+                            <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 italic">
                                 Showing {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? 's' : ''}
                                 {filter !== 'all' ? ` in ${filter}` : ''}
                             </p>
