@@ -22,6 +22,8 @@ const AdminHomePage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
+    const isSuperAdmin = user?.role === 'superadmin';
+
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         setError('');
@@ -42,7 +44,7 @@ const AdminHomePage: React.FC = () => {
                 setManagedAreaIds(ids);
             }
         } catch (err) {
-            setError('We couldn’t load your dashboard at the moment. Please refresh the page or try again later.');
+            setError("We couldn't load your dashboard at the moment. Please refresh the page or try again later.");
         } finally {
             setIsLoading(false);
         }
@@ -53,19 +55,18 @@ const AdminHomePage: React.FC = () => {
     }, [fetchData]);
 
     const managedRequests = useMemo(() => {
-        const isSuperAdmin = user?.role === 'superadmin';
         console.log('role:', user?.role);
         console.log('isSuperAdmin:', isSuperAdmin);
         console.log('managedAreaIds set:', [...managedAreaIds]);
         console.log('all requests:', requests.map(r => ({ id: r.id, areaId: (r as any).areaId })));
-        
+
         if (isSuperAdmin) return requests;
         return requests.filter(r => {
             const areaId = getAreaId(r);
             console.log('checking:', areaId, '| in set:', managedAreaIds.has(areaId));
             return areaId && managedAreaIds.has(areaId);
         });
-    }, [requests, user, managedAreaIds]);
+    }, [requests, user, managedAreaIds, isSuperAdmin]);
 
     const summaryCounts = useMemo(() => {
         console.log('managedRequests count:', managedRequests.length);
@@ -88,7 +89,7 @@ const AdminHomePage: React.FC = () => {
     }, [managedRequests]);
 
     if (isLoading) {
-        return <div className="container mx-auto p-6 text-center dark:text-white">Loading Admin Dashboard...</div>;
+        return <div className="container mx-auto p-6 text-center dark:text-white">Loading {isSuperAdmin ? 'Super Admin' : 'Admin'} Dashboard...</div>;
     }
 
     if (error) {
@@ -97,7 +98,9 @@ const AdminHomePage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <h1 className="text-3xl font-bold dark:text-white">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold dark:text-white">
+                {isSuperAdmin ? 'Super Admin Dashboard' : 'Admin Dashboard'}
+            </h1>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="!p-0 w-full !max-w-none flex flex-col">
